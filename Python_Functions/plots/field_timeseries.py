@@ -19,6 +19,7 @@ def field_timeseries(data, model_name, output_folder_name, colo_output_folder, p
     plt.xlabel('Datetime')
     plt.ylabel(pollutant + ' Concentration (' + unit + ')')
 
+    plt.show()
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, model_name + '_field_prediction_timeseries.png'))
 

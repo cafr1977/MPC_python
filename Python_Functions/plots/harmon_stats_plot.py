@@ -8,6 +8,7 @@ import seaborn as sns
 import copy
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
 
 def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, sensors_included):
     # Create a deep copy of the model_stats dictionary to avoid modifying the original data
@@ -18,13 +19,13 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     for stat in model_stats:
         for sensor in model_stats[stat]:
            model_stats_melted[stat][sensor] = pd.melt(model_stats_melted[stat][sensor], var_name='pod', value_name='value')
-        temp[stat] = pd.concat([df.assign(sensor=name) for name, df in model_stats_melted[stat].items()])      
+        temp[stat] = pd.concat([df.assign(sensor=name) for name, df in model_stats_melted[stat].items()])
 
     # Concatenate the melted dataframes into a single dataframe
     stats_df = pd.concat([df.assign(stat=name) for name, df in temp.items()])
 
     # Split the 'stat' column into two columns using '_' so that testing or training is in one column and the stat is in the other
-    stats_df[['data_type', 'stat']] = stats_df['stat'].str.split('_', 1, expand=True)
+    stats_df[['data_type', 'stat']] = stats_df['stat'].str.split('_', n=1, expand=True)
 
     # Create a FacetGrid for visualizing the melted data
     stat_plot = sns.FacetGrid(stats_df, row='sensor', col='stat', sharey=False, hue='data_type')
@@ -36,9 +37,11 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     for ax in stat_plot.axes[:, 0]:
         ax.set_ylim(0, 1.2)
 
+    plt.show()
+
     # Save the FacetGrid as an image file
     stat_plot.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmonization_stats.png'))
 
+    plt.figure()
 # Example usage:
 # harmon_stats_plot(model_stats, 'OutputFolderName', 'ColoOutputFolder', 'SensorsIncluded')
-       
