@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+"""
+
+@author: cfris
+"""
 import pandas as pd
 
 def load_deployment_log():
@@ -30,8 +35,4 @@ def load_deployment_log():
     # Convert columns to specified data types
     for col, dtype in dl_dtype.items():
         deployment_log[col] = deployment_log[col].astype(dtype)
-
-    deployment_log['pollutant'][deployment_log['pollutant']=='nan']=''
-    deployment_log['location'][deployment_log['location']=='nan']=''
-
     return deployment_log
