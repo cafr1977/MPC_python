@@ -20,6 +20,7 @@ def field_boxplot(data, model_name, output_folder_name, colo_output_folder, poll
     plt.xlabel('Pod site')
     plt.ylabel(pollutant + ' Concentration (' + unit + ')')
 
+    plt.show()
     # Save the boxplot as an image file
     plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, model_name + '_field_prediction_boxplot.png'))
 

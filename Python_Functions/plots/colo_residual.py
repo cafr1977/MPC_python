@@ -28,11 +28,14 @@ def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train,
         # Set labels and title
         axs[i+1].set_xlabel(X_features[i])
         axs[i+1].set_ylabel('Residuals')
-    
+
+
     # Plot KDE (Kernel Density Estimate) for residuals
-    sns.kdeplot(y=training_residuals, ax=axs[0], color='blue', label='training')
-    sns.kdeplot(y=testing_residuals, ax=axs[0], color='lightblue', label='testing')
-    
+    sns.kdeplot(data=training_residuals, ax=axs[0], color='blue', label='training')
+    sns.kdeplot(data=testing_residuals, ax=axs[0], color='lightblue', label='testing')
+
+    print("Ignore FutureWarning about mode.use_inf_as_na for now. It is from kdeplot in colo_residual. Cannot figure out why")
+
     # Set labels and title for the PDF subplot
     axs[0].set_xlabel('Residuals')
     axs[0].set_ylabel('Probability Density')

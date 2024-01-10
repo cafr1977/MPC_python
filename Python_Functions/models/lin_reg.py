@@ -7,6 +7,7 @@ def lin_reg(X_train, y_train, X_test, y_test, X_std, model_name,pollutant,output
     current_model= LinearRegression()
     #train the model using training data
     current_model.fit(X_train, y_train)
+
     
     #get the predicted y values for the model
     y_train_predicted = current_model.predict(X_train)
