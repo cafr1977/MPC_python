@@ -33,7 +33,7 @@ settings={}
 plt.close('all')
 
 #Variable to change for your analysis
-settings['ref_file_name'] = "InnerPort_101023_103023_voc" #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
+settings['ref_file_name'] = "InnerPort_101023_122023_voc" #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
 settings['pollutant']='TVOC' #make sure this matches the column name in the reference data file (CSV or XLSX)
 settings['unit'] = 'ppb' #concentration units of the target pollutant (for plot labels)
 settings['time_interval'] = 5 #time averaging in minutes. needs to be at least as high as the time resolution of the data
@@ -46,10 +46,10 @@ settings['traintest_split_type'] = 'mid_end_split' #how the data is split into t
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
 
-settings['models']=['lin_reg'] #which models are run on the data
+settings['models']=['lin_reg','random_forest','lasso','ridge'] #which models are run on the data
 #'lin_reg','random_forest','lasso','ridge'
 
-settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup","add_time_elapsed","fig_ratio"] 
+settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
 # temp_C_2_K": converts temperature from C to K, required for HumRel2Abs to run
 #hum_rel_2_abs: converts humidity from relative to absolute
 #rmv_warmup: Removes the first 45 minutes of data, as well as 45 minutes of data after the pod cuts out for more than 10 min
