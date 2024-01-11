@@ -9,40 +9,39 @@ import joblib
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+
+#packages from python_functions folder
+from Python_Functions import preprocessing_func
+from Python_Functions import data_loading_func
+from Python_Functions import plotting_func
+
+#initialize a dictionary (do not edit this line)
+hf_set = {}
 
 ####
-#edit this first line with the desired colocation output folder
+#edit the variables in this section for the harmonization - field run
 colo_output_folder = 'Output_240109132423' #the code will pull the best_model from this, and also save new stuff into it
+hf_set['run_field'] = True      #True if you want to apply calibration to field data,
+                                    #False if you only want to look at harmonization data
+hf_set['best_model'] = 'lin_reg'    #model that you would like to apply to field data from the output_folder
+hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
+hf_set['field_plot_list'] = ['field_timeseries','field_boxplot'] #field plots
+hf_set['harmon_plot_list'] = ['harmon_scatter','harmon_stats_plot','harmon_timeseries'] #harmonization plots
 ####
 
-####
-#DO NOT EDIT THIS SECTION#
+###############
 # Check if the output folder exists
 if not os.path.exists(os.path.join('Outputs', colo_output_folder)):
     raise FileNotFoundError("The colocation output folder does not exist. Please double-check 'colo_output_folder'.")
 #load run settings
 settings = joblib.load(os.path.join('Outputs', colo_output_folder, 'run_settings.joblib')) #do not change this line!
-###########
 
-####
-#Edit the variables in this section for your run
-settings['run_field'] = True      #True if you want to apply calibration to field data,
-                                    #False if you only want to look at harmonization data
-
-settings['best_model'] = 'lin_reg'    #model that you would like to apply to field data from the output_folder
-
-settings['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
-
-settings['field_plot_list'] = ['field_timeseries','field_boxplot'] #field plots
-settings['harmon_plot_list'] = ['harmon_scatter','harmon_stats_plot','harmon_timeseries'] #harmonization plots
-####
-
-
-###############
+settings = {**settings, **hf_set}
 
 #close previous figures
 plt.close('all')
@@ -58,8 +57,7 @@ output_folder_name = f'Output_{current_time}'
 os.makedirs(os.path.join('Outputs', colo_output_folder, output_folder_name))
 
 # Load deployment log
-from Python_Functions.other import load_deployment_log
-deployment_log = load_deployment_log.load_deployment_log()
+deployment_log = data_loading_func.load_deployment_log()
 
 
 #Load harmonization data
@@ -77,14 +75,11 @@ if not isinstance(colo_pod_name, str): #first check that colo_pod_name is a stri
     colo_pod_name = colo_pod_name[0]
 
 #load pod data
-from Python_Functions.other import load_data
-pod_harmonization_data = load_data.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'])
+pod_harmonization_data = data_loading_func.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'])
 
 # Check if there is any field data
 assert bool(pod_harmonization_data), "No harmonization data was found in the Harmonization folder that matched the deployment log. Stopping execution."
-    
 
-from Python_Functions.preprocess import preprocessing_func
 for podname in pod_harmonization_data:
     #harmonization data preprocessing
    pod_harmonization_data[podname] = preprocessing_func.preprocessing_func(pod_harmonization_data[podname], settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
@@ -119,9 +114,6 @@ del harmonization_mdls[colo_pod_name]
 #rename the colocation pod columns so we can differentiate in later code between regular pod and colo pod
 column_coloPod =  {col: col + '_colo' for col in pod_harmonization_data[colo_pod_name].columns}
 pod_harmonization_data[colo_pod_name]=pod_harmonization_data[colo_pod_name].rename(columns=column_coloPod)
-
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
 
 for pod_num, podname in enumerate(pod_fitted):
     #make dataframes to put the preprocessed and fitted data into.
@@ -186,16 +178,13 @@ for pod_num, podname in enumerate(pod_fitted):
 
 # Harmonization plotting
 if 'harmon_stats_plot' in settings['harmon_plot_list']:
-    from Python_Functions.plots import harmon_stats_plot
-    harmon_stats_plot.harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, settings['sensors_included'])
+    plotting_func.harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, settings['sensors_included'])
     
 if 'harmon_scatter' in settings['harmon_plot_list']:
-    from Python_Functions.plots import harmon_scatter
-    harmon_scatter.harmon_scatter(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name)
+    plotting_func.harmon_scatter(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name)
     
 if 'harmon_timeseries' in settings['harmon_plot_list']:
-    from Python_Functions.plots import harmon_timeseries
-    harmon_timeseries.harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name)
+    plotting_func.harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name)
 
 
 ####### start field data
@@ -215,7 +204,7 @@ if settings['run_field'] == True:
     pod_field_data = dict.fromkeys(field_pod_list)
     
     #load pod data
-    pod_field_data = load_data.load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'])
+    pod_field_data = data_loading_func.load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'])
     
     # Check for pods in field_list not present in harmonization_list
     not_in_harmonization = [item for item in field_pod_list if item not in list(pod_harmonization_data)]
@@ -260,18 +249,15 @@ if settings['run_field'] == True:
         
         #create interaction terms if using in the colocation model
         if "interaction_terms" in settings['preprocess']:
-            from Python_Functions.preprocess import interaction_terms
-            X_fitted_field[podname] = interaction_terms.interaction_terms(X_fitted_field[podname])          
+            X_fitted_field[podname] = preprocessing_func.interaction_terms(X_fitted_field[podname])
     
         #time elapsed needs to come after time averaging to be accurate (at least for median)
         if "add_time_elapsed" in settings['preprocess']:
-            from Python_Functions.preprocess import add_time_elapsed
-            X_fitted_field[podname] = add_time_elapsed.add_time_elapsed(X_fitted_field[podname], settings['earliest_time'])
+            X_fitted_field[podname] = preprocessing_func.add_time_elapsed(X_fitted_field[podname], settings['earliest_time'])
         
             #if you are using a fig2600/fig2602 ratio, make that column here
         if "fig_ratio" in settings['preprocess']:
-            from Python_Functions.preprocess import fig_ratio
-            X_fitted_field[podname] = fig_ratio.fig_ratio(X_fitted_field[podname])
+            X_fitted_field[podname] = preprocessing_func.fig_ratio(X_fitted_field[podname])
     
         #Scaling of fitted X field data
         X_fitted_field_std[podname] = settings['scaler'].fit_transform(X_fitted_field[podname])
@@ -285,18 +271,15 @@ if settings['run_field'] == True:
     Y_field_df=pd.concat([df.assign(pod=name) for name, df in Y_field_noindex.items()])
     
     # Add location column to plot by this instead of pod
-    from Python_Functions.other import field_location
-    Y_field_df = field_location.field_location(Y_field_df, deployment_log)
+    Y_field_df = data_loading_func.field_location(Y_field_df, deployment_log)
 
     #field plotting
     if 'field_timeseries' in settings['field_plot_list']:
-        from Python_Functions.plots import field_timeseries
-        field_timeseries.field_timeseries(Y_field_df, settings['best_model'], output_folder_name, colo_output_folder, settings['pollutant'],settings['unit'])
+        plotting_func.field_timeseries(Y_field_df, settings['best_model'], output_folder_name, colo_output_folder, settings['pollutant'],settings['unit'])
     
     
     if 'field_boxplot' in settings['field_plot_list']:
-        from Python_Functions.plots import field_boxplot
-        field_boxplot.field_boxplot(Y_field_df, settings['best_model'], output_folder_name, colo_output_folder, settings['pollutant'],settings['unit'])
+        plotting_func.field_boxplot(Y_field_df, settings['best_model'], output_folder_name, colo_output_folder, settings['pollutant'],settings['unit'])
     
     #save out important info
          
