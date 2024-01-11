@@ -20,11 +20,11 @@ def rmv_warmup(data, t_warmup):
     indices_to_remove = set()
     for i,remove in enumerate(rows_to_remove):
         if remove:
-            indices_to_remove.add(i)  #if the row is one that has a greater time diff, it is added to the list of what should be removed
+            indices_to_remove.add(data.index[i])  #if the row is one that has a greater time diff, it is added to the list of what should be removed
             for j in range(i+1, len(rows_to_remove)):
-                if data['datetime'][j]-data['datetime'][i] > pd.Timedelta(minutes=t_warmup): #if the next row is less than the total warm up time, it should also be removed. here, this inner loop breaks if the time is past the warm up period
+                if data.index[j]-data.index[i] > pd.Timedelta(minutes=t_warmup): #if the next row is less than the total warm up time, it should also be removed. here, this inner loop breaks if the time is past the warm up period
                     break
-                indices_to_remove.add(j)
+                indices_to_remove.add(data.index[j])
                 
     data = data.drop(index=list(indices_to_remove))
     return data
