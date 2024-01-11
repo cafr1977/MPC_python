@@ -19,6 +19,12 @@ from datetime import datetime
 import importlib
 import joblib
 
+#packages from python_functions folder
+from Python_Functions import preprocessing_func
+from Python_Functions import test_train_split_func
+from Python_Functions import data_loading_func
+from Python_Functions import plotting_func
+
 #Other packages that must be installed prior to running:
     #atmos (for humidity conversion)
     #numpy
@@ -33,20 +39,22 @@ settings={}
 plt.close('all')
 
 #Variable to change for your analysis
-settings['ref_file_name'] = "InnerPort_101023_122023_voc" #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
+settings['colo_run_name'] = ''  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
+# ^^ If you want the outputs folder to just be named with current name, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
+settings['ref_file_name'] = 'InnerPort_101023_122023_voc' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
 settings['pollutant']='TVOC' #make sure this matches the column name in the reference data file (CSV or XLSX)
 settings['unit'] = 'ppb' #concentration units of the target pollutant (for plot labels)
-settings['time_interval'] = 5 #time averaging in minutes. needs to be at least as high as the time resolution of the data
+settings['time_interval'] = 15 #time averaging in minutes. needs to be at least as high as the time resolution of the data
 settings['retime_calc'] = "median" #How the time averaging is calculated. Options are median and mean right now and are the same for pod and ref
 settings['sensors_included'] = ['Temperature','Humidity','Fig2600','Fig2602','Fig3','Fig4']
 settings['scaler'] = StandardScaler() #How the data is scaled. StandardScaler is mean zero and st dev 1
 settings['t_warmup'] = 45 #warm up period in minutes 
 settings['test_percentage'] = 0.2 #what percentage of data goes into the test set, usually 0.2 or 0.3
-settings['traintest_split_type'] = 'mid_end_split' #how the data is split into train and test
+settings['traintest_split_type'] = 'end_test' #how the data is split into train and test
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
 
-settings['models']=['lin_reg','random_forest','lasso','ridge'] #which models are run on the data
+settings['models']=['lin_reg'] #which models are run on the data
 #'lin_reg','random_forest','lasso','ridge'
 
 settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
@@ -60,18 +68,27 @@ settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
 
 settings['colo_plot_list'] = ['colo_residual','colo_timeseries','colo_scatter','colo_stats_plot'] # plots to plot and save
 
-#Column_names is a dictionary of column name lists. The name of the list corresponds to the deployment log "header_type" column
-settings['column_names'] = {'3.1.0':["datetime","Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater", "Misc2611",
-                 "PID", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity",
-                 "Quad1C1", "Quad1C2","Quad1C3","Quad1C4", "Quad2C1", "Quad2C2","Quad2C3","Quad2C4",
-                 "MQ131","PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
-                 "PM 25 um", "PM 50 um", "PM 100 um",'OPC1','OPC2','OPC3','OPC4','OPC5','WS_mph','WD','unk'],
-               
-               '3.2.0':["datetime","Volts", "Figaro2600", "Figaro2602","Figaro3","Fig3heater", "Figaro4","Fig4heater", "Misc2611",
-                                "PID", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity", "Quad1C1", "Quad1C2",
-                                "Quad1C3","Quad1C4","Quad2C1", "Quad2C2","Quad2C3","Quad2C4",
+#Column_names is a dictionary of column names and data types. The name of the list corresponds to the deployment log "header_type" column
+# possible data types:
+#datetime64[ns] = datetime
+#float64 = numeric non-integer
+#int32 = numeric integer (1,2,3)
+#str = string (text)
+settings['column_names'] = {'3.1.0':
+                                ["datetime", "Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater",
+                                 "Misc2611","PID", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity",
+                                "Quad1C1", "Quad1C2","Quad1C3","Quad1C4", "Quad2C1", "Quad2C2","Quad2C3","Quad2C4",
                                 "MQ131","PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
-                                "PM 25 um", "PM 50 um", "PM 100 um",'OPC1','OPC2','OPC3','OPC4','OPC5','WS_mph','WD','unk']}
+                                "PM 25 um", "PM 50 um", "PM 100 um",'OPC1','OPC2','OPC3','OPC4','OPC5','WS_mph','WD','unk'],
+
+                            '3.2.0':
+                                ["datetime", "Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater",
+                                 "Misc2611","PID", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity",
+                                "MQ131","PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
+                                "PM 25 um", "PM 50 um", "PM 100 um"],
+
+
+                            }
 
 ###############
 
@@ -81,18 +98,23 @@ settings['column_names'] = {'3.1.0':["datetime","Volts", "Fig2600", "Fig2602","F
 
 
 #Create output folder
-# Get the current time as YYMMDDHHss
-current_time = datetime.now().strftime('%y%m%d%H%M%S')
-# Create the output folder name
-output_folder_name = f'Output_{current_time}'
-# Create the output folder
-os.makedirs(os.path.join('Outputs', output_folder_name))
+if settings['colo_run_name'] == '':
+    # Get the current time as YYMMDDHHss
+    current_time = datetime.now().strftime('%y%m%d%H%M%S')
+    # Create the output folder name
+    output_folder_name = f'Output_{current_time}'
+    del current_time
+else: output_folder_name = f'Output_{settings["colo_run_name"]}'
 
-del current_time
+# Check if the directory already exists
+if os.path.exists(os.path.join('Outputs', output_folder_name)):
+    raise FileExistsError(f"The Output folder '{output_folder_name}' already exists. Please choose a different output folder name or use the current time option (settings['colo_run_name'] == '').")
+else:
+    # If the directory doesn't exist, create it
+    os.makedirs(os.path.join('Outputs', output_folder_name))
 
 # Load deployment log
-from Python_Functions.other.load_deployment_log import load_deployment_log
-deployment_log = load_deployment_log()
+deployment_log = data_loading_func.load_deployment_log()
 
 #get the earliest start time (for time elapsed)
 if "add_time_elapsed" in settings['preprocess']:
@@ -110,8 +132,7 @@ if len(settings['colo_pod_name']) != 1:
     raise KeyError('Run cannot continue because there is more than one unique colocation pod listed in the deployment log for the pollutant of interest.')
 
 #load pod data
-from Python_Functions.other import load_data
-colo_pod_data = load_data.load_data(colo_file_list,deployment_log,settings['column_names'], 'C',settings['pollutant'])
+colo_pod_data = data_loading_func.load_data(colo_file_list,deployment_log,settings['column_names'], 'C',settings['pollutant'])
 
 if colo_pod_data.empty:
     raise AssertionError("No colocation pod data was found in the Colocation Pod folder that matched the deployment log. Stopping execution.")
@@ -144,7 +165,6 @@ ref_data = ref_data.rename(settings['pollutant'] + '_ref')
 #scaling happens in the ML section instead of the preprocess section here BECAUSE WE WANT TO SCALE ONLY THE TRAINING DATA
 
 #colo pod preprocessing
-from Python_Functions.preprocess import preprocessing_func
 colo_pod_data = preprocessing_func.preprocessing_func(colo_pod_data, settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
 
 #ref data preprocessing
@@ -173,12 +193,10 @@ data_combined.dropna(inplace=True)
 
 #add some preprocessing that has to happen after the data is aligned, and therefore can't happen in the "preprocessing" function
 if "add_time_elapsed" in settings['preprocess']:
-    from Python_Functions.preprocess import add_time_elapsed
-    data_combined = add_time_elapsed.add_time_elapsed(data_combined, settings['earliest_time'])
+    data_combined = preprocessing_func.add_time_elapsed(data_combined, settings['earliest_time'])
 
 if "fig_ratio" in settings['preprocess']:
-    from Python_Functions.preprocess import fig_ratio
-    data_combined = fig_ratio.fig_ratio(data_combined)         
+    data_combined = preprocessing_func.fig_ratio(data_combined)
      
 
 #begin ML 
@@ -188,20 +206,17 @@ y=data_combined[settings['pollutant'] + '_ref']
 
 #if using interaction terms in the model, this is where you add it
 if "interaction_terms" in settings['preprocess']:
-    from Python_Functions.preprocess import interaction_terms
-    X = interaction_terms.interaction_terms(X)       
+    X = preprocessing_func.interaction_terms(X)
 
 #delete data_combined
 del data_combined
 
 #Train and Test split
 if settings['traintest_split_type'] == 'end_test':
-    from Python_Functions.test_train_split import end_test
-    X_train, y_train, X_test, y_test = end_test.end_test(settings['test_percentage'], X, y)
+    X_train, y_train, X_test, y_test = test_train_split_func.end_test(settings['test_percentage'], X, y)
 
 elif settings['traintest_split_type'] == 'mid_end_split':
-    from Python_Functions.test_train_split import mid_end_split
-    X_train, y_train, X_test, y_test = mid_end_split.mid_end_split(settings['test_percentage'], X, y)
+    X_train, y_train, X_test, y_test = test_train_split_func.mid_end_split(settings['test_percentage'], X, y)
     
 else: 
     raise KeyError('Invalid traintest_split_type, run is ended')
@@ -226,10 +241,10 @@ del y, X, X_train_std, X_test_std
 
 #first, establish a dataframe to save model statistics in
 model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
-models_folder = "Python_Functions." + "models"
+#models_folder = "Python_Functions." + "models"
 for i, model_name in enumerate(settings['models']):
     # Import the module dynamically
-    model_module = importlib.import_module(f"{models_folder}.{model_name}")
+    model_module = importlib.import_module('Python_Functions.colo_model_func')
     # Get the function from the module
     model_func = getattr(model_module, model_name)
     # Call the function to apply the model_name model
@@ -242,24 +257,20 @@ for i, model_name in enumerate(settings['models']):
      
 #plotting of modelled data
     if 'colo_timeseries' in settings['colo_plot_list']:
-        from Python_Functions.plots import colo_timeseries
-        colo_timeseries.colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name, output_folder_name)
+        plotting_func.colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name, output_folder_name, settings['colo_run_name'])
         
     if 'colo_scatter' in settings['colo_plot_list']:
-        from Python_Functions.plots import colo_scatter
-        colo_scatter.colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name, output_folder_name)
+        plotting_func.colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name, output_folder_name, settings['colo_run_name'])
         
     if 'colo_residual' in settings['colo_plot_list']:
-       from Python_Functions.plots import colo_residual
-       colo_residual.colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test, settings['pollutant'], model_name, output_folder_name,X_std.columns) 
+       plotting_func.colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test, settings['pollutant'], model_name, output_folder_name,X_std.columns, settings['colo_run_name'])
 
 #save out the model for later analysis and use in field data
 model_stats.to_csv(os.path.join('Outputs', output_folder_name, 'colo_model_stats.csv'), index = True)
 
 #stats_plot plots the R2, RMSE, and MBE of train and test data as a bar graph
 if "colo_stats_plot" in settings['colo_plot_list']:
-    from Python_Functions.plots import colo_stats_plot 
-    colo_stats_plot.colo_stats_plot(settings['models'], model_stats, settings['pollutant'],output_folder_name)
+    plotting_func.colo_stats_plot(settings['models'], model_stats, settings['pollutant'],output_folder_name, settings['colo_run_name'])
     
 #save out settings for future reference
 joblib.dump(settings, os.path.join('Outputs', output_folder_name, 'run_settings.joblib'))
