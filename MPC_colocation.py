@@ -68,12 +68,10 @@ settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
 
 settings['colo_plot_list'] = ['colo_residual','colo_timeseries','colo_scatter','colo_stats_plot'] # plots to plot and save
 
-#Column_names is a dictionary of column names and data types. The name of the list corresponds to the deployment log "header_type" column
-# possible data types:
-#datetime64[ns] = datetime
-#float64 = numeric non-integer
-#int32 = numeric integer (1,2,3)
-#str = string (text)
+#Column_names is a dictionary of column names lists that will be applied to pod data.
+# The name of the list corresponds to the deployment log "header_type" column
+# besides datetime (or date and time), ALL columns must be numeric.
+#if you want to have data columns that are strings (text), discuss with caroline.
 settings['column_names'] = {'3.1.0':
                                 ["datetime", "Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater",
                                  "Misc2611","PID", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity",
@@ -93,6 +91,7 @@ settings['column_names'] = {'3.1.0':
 ###############
 
 #Begin code
+print('Beginning "MPC Colocation"')
 
 #save the settings for harmonization_field run
 
@@ -114,6 +113,7 @@ else:
     os.makedirs(os.path.join('Outputs', output_folder_name))
 
 # Load deployment log
+print('Loading deployment log...')
 deployment_log = data_loading_func.load_deployment_log()
 
 #get the earliest start time (for time elapsed)
@@ -132,6 +132,7 @@ if len(settings['colo_pod_name']) != 1:
     raise KeyError('Run cannot continue because there is more than one unique colocation pod listed in the deployment log for the pollutant of interest.')
 
 #load pod data
+print('Loading colocation pod data...')
 colo_pod_data = data_loading_func.load_data(colo_file_list,deployment_log,settings['column_names'], 'C',settings['pollutant'])
 
 if colo_pod_data.empty:
@@ -139,6 +140,7 @@ if colo_pod_data.empty:
 
 # Load reference data from either CSV or Excel file
 # Check if the CSV file exists, and if not, try loading the Excel file
+print('Loading reference data...')
 try:
     ref_data = pd.read_csv(os.path.join("Colocation", "Reference", f"{settings['ref_file_name']}.csv"))
 except FileNotFoundError:
@@ -165,6 +167,7 @@ ref_data = ref_data.rename(settings['pollutant'] + '_ref')
 #scaling happens in the ML section instead of the preprocess section here BECAUSE WE WANT TO SCALE ONLY THE TRAINING DATA
 
 #colo pod preprocessing
+print('Preprocessing colocation pod and reference data...')
 colo_pod_data = preprocessing_func.preprocessing_func(colo_pod_data, settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
 
 #ref data preprocessing
@@ -181,7 +184,8 @@ ref_data.dropna(inplace=True)
 if not isinstance(settings['time_interval'], str): #first check that time_interval is a string
     settings['time_interval'] = str(settings['time_interval'])
 
-#time average and align the colocation and reference data    
+#time average and align the colocation and reference data
+print('Re-timing colocation pod and reference data...')
 if settings['retime_calc']=='median':
     data_combined= pd.concat([colo_pod_data, ref_data], axis=1).resample(settings['time_interval']+'T').median()
 if settings['retime_calc']=='mean':
@@ -199,7 +203,8 @@ if "fig_ratio" in settings['preprocess']:
     data_combined = preprocessing_func.fig_ratio(data_combined)
      
 
-#begin ML 
+#begin ML
+print('Initializing models...')
 #create X and y dataframes
 X=data_combined.drop([settings['pollutant'] + '_ref'],axis=1)
 y=data_combined[settings['pollutant'] + '_ref']
@@ -243,6 +248,7 @@ del y, X, X_train_std, X_test_std
 model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
 #models_folder = "Python_Functions." + "models"
 for i, model_name in enumerate(settings['models']):
+    print(f'Fitting colocation pod data to reference data using model {model_name}...')
     # Import the module dynamically
     model_module = importlib.import_module('Python_Functions.colo_model_func')
     # Get the function from the module

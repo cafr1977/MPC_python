@@ -26,7 +26,7 @@ hf_set = {}
 ####
 #edit the variables in this section for the harmonization - field run
 colo_output_folder = 'Output_240109132423' #the code will pull the best_model from this, and also save new stuff into it
-hf_set['run_field'] = True      #True if you want to apply calibration to field data,
+hf_set['run_field'] = True    #True if you want to apply calibration to field data,
                                     #False if you only want to look at harmonization data
 hf_set['best_model'] = 'lin_reg'    #model that you would like to apply to field data from the output_folder
 hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
@@ -51,12 +51,13 @@ plt.close('all')
 # Get the current time as YYMMDDHHss
 current_time = datetime.now().strftime('%y%m%d%H%M%S')
 # Create the output folder name
-output_folder_name = f'Output_{current_time}'
+output_folder_name = f'Output_{settings["best_model"]}_{current_time}'
 
 # Create the output folder
 os.makedirs(os.path.join('Outputs', colo_output_folder, output_folder_name))
 
 # Load deployment log
+print('Loading deployment log...')
 deployment_log = data_loading_func.load_deployment_log()
 
 
@@ -75,11 +76,13 @@ if not isinstance(colo_pod_name, str): #first check that colo_pod_name is a stri
     colo_pod_name = colo_pod_name[0]
 
 #load pod data
+print('Loading harmonization pod data...')
 pod_harmonization_data = data_loading_func.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'])
 
 # Check if there is any field data
 assert bool(pod_harmonization_data), "No harmonization data was found in the Harmonization folder that matched the deployment log. Stopping execution."
 
+print('Preprocessing harmonization pod and reference data...')
 for podname in pod_harmonization_data:
     #harmonization data preprocessing
    pod_harmonization_data[podname] = preprocessing_func.preprocessing_func(pod_harmonization_data[podname], settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
@@ -142,7 +145,8 @@ for pod_num, podname in enumerate(pod_fitted):
         #initiate lin reg model for colo pod sensor to field pod sensor
         CV_model= LinearRegression()
         current_model= LinearRegression()
-         
+
+        print(f'Harmonizing pod {podname} {sensor} sensor to the colocation pod {sensor}...')
         # Perform k-fold cross-validation
         for fold, (train_index, test_index) in enumerate(kf.split(X, y)):
             X_train, X_test = X.iloc[train_index], X.iloc[test_index]
@@ -188,13 +192,15 @@ if 'harmon_timeseries' in settings['harmon_plot_list']:
 
 
 ####### start field data
-
-if settings['run_field'] == True:
-
+if settings['run_field'] == False:
+    print("settings['run_field'] set to False, so no field analysis will be conducted.")
+elif settings['run_field'] == True:
+    print('Beginning field data analysis...')
     #after running MPC_python_120523, upload the chosen model using joblib
     fit_model= joblib.load(os.path.join('Outputs', colo_output_folder, f'{settings["best_model"]}_model.joblib'))
     
     #Load field data
+    print('Loading field data...')
     #get list of all field files to combine
     field_file_list = deployment_log[(deployment_log['deployment']=='F')]['file_name']
     #shorten the list to just the pod names (not the whole file name)
@@ -229,6 +235,7 @@ if settings['run_field'] == True:
     
     
     for podname in pod_field_data:
+        print(f'Preprocessing, harmonizing, and calibrating pod {podname}...')
         #field data preprocessing
         pod_field_data[podname] = preprocessing_func.preprocessing_func(pod_field_data[podname], settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
     
@@ -282,7 +289,7 @@ if settings['run_field'] == True:
         plotting_func.field_boxplot(Y_field_df, settings['best_model'], output_folder_name, colo_output_folder, settings['pollutant'],settings['unit'])
     
     #save out important info
-         
+    print('Saving important run data...')
     #save y_field data by pod
     excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'y_field_estimates_by_pod.xlsx')
     with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
