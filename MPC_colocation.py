@@ -14,10 +14,18 @@ Created on Tue Dec  5 11:21:47 2023
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler  #pip install scikit-learn
 from datetime import datetime
 import importlib
 import joblib
+
+# Other packages that must be installed prior to running:
+# atmos (for humidity conversion)
+# numpy
+# xlsxwriter
+
+#Begin code
+print('Beginning "MPC Colocation"')
 
 #packages from python_functions folder
 from Python_Functions import preprocessing_func
@@ -25,11 +33,7 @@ from Python_Functions import test_train_split_func
 from Python_Functions import data_loading_func
 from Python_Functions import plotting_func
 
-#Other packages that must be installed prior to running:
-    #atmos (for humidity conversion)
-    #numpy
-    #xlsxwriter
-    
+
 
 #########
 #initiate settings
@@ -50,11 +54,11 @@ settings['sensors_included'] = ['Temperature','Humidity','Fig2600','Fig2602','Fi
 settings['scaler'] = StandardScaler() #How the data is scaled. StandardScaler is mean zero and st dev 1
 settings['t_warmup'] = 45 #warm up period in minutes 
 settings['test_percentage'] = 0.2 #what percentage of data goes into the test set, usually 0.2 or 0.3
-settings['traintest_split_type'] = 'end_test' #how the data is split into train and test
+settings['traintest_split_type'] = 'mid_end_split' #how the data is split into train and test
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
 
-settings['models']=['lin_reg'] #which models are run on the data
+settings['models']=['lin_reg', 'lin_reg_weighted'] #which models are run on the data
 #'lin_reg','random_forest','lasso','ridge'
 
 settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
@@ -63,10 +67,16 @@ settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
 #rmv_warmup: Removes the first 45 minutes of data, as well as 45 minutes of data after the pod cuts out for more than 10 min
 #add_time_elapsed: Adds a column to the X dataframe of how much time has elapsed since the first data point. Helpful for drift
 #fig_ratio: adds a column to the X dataframe that is fig 2600 divided by fig 2602
-
+#binned_resample:
+#resample_quartile:
 #Preprocessing time sort, remove NaN, remove 999 are done automatically to avoid errors.
 
-settings['colo_plot_list'] = ['colo_residual','colo_timeseries','colo_scatter','colo_stats_plot'] # plots to plot and save
+#Sub settings for some preprocessing functions
+settings['quartiles_to_resample'] = ['first','second']   ##which quantiles you want to downsample from if applying 'downsample_quant' in 'preprocess
+settings['quartiles_downsampling_rate'] = 0.7   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
+settings['n_bins']= 5   ## If using binned_resample, choose how many bins to split the data into.
+
+settings['colo_plot_list'] = ['colo_timeseries', 'colo_stats_plot'] # plots to plot and save
 
 #Column_names is a dictionary of column names lists that will be applied to pod data.
 # The name of the list corresponds to the deployment log "header_type" column
@@ -90,10 +100,12 @@ settings['column_names'] = {'3.1.0':
 
 ###############
 
-#Begin code
-print('Beginning "MPC Colocation"')
+## Begin actual code
 
-#save the settings for harmonization_field run
+#check for contradictions in preprocessing
+if 'resample_quant1' in settings['preprocess'] and 'binned_resample' in settings['preprocess']:
+    raise ValueError("binned_resample and resample_quant1 are both present in settings['preprocess']."
+                     "Only one resample technique is allowed.")
 
 
 #Create output folder
@@ -201,7 +213,6 @@ if "add_time_elapsed" in settings['preprocess']:
 
 if "fig_ratio" in settings['preprocess']:
     data_combined = preprocessing_func.fig_ratio(data_combined)
-     
 
 #begin ML
 print('Initializing models...')
@@ -214,7 +225,7 @@ if "interaction_terms" in settings['preprocess']:
     X = preprocessing_func.interaction_terms(X)
 
 #delete data_combined
-del data_combined
+#del data_combined
 
 #Train and Test split
 if settings['traintest_split_type'] == 'end_test':
@@ -225,7 +236,15 @@ elif settings['traintest_split_type'] == 'mid_end_split':
     
 else: 
     raise KeyError('Invalid traintest_split_type, run is ended')
-    
+
+#Bin-based downsampling happens here, only on training data, if included in preprocessing
+if "binned_resample" in settings['preprocess']:
+    X_train, y_train = preprocessing_func.binned_resample(X_train, y_train, settings['n_bins'])
+
+if "resample_quartile" in settings['preprocess']:
+    for quartile in settings['quartiles_to_resample']:
+        X_train, y_train = preprocessing_func.resample_quartile(X_train, y_train, quartile, settings['quartiles_downsampling_rate'])
+
 #Scale the data using the technique specified in "scaler"
 X_train_std = settings['scaler'].fit_transform(X_train)
 X_test_std = settings['scaler'].transform(X_test)
@@ -233,6 +252,7 @@ X_std = pd.DataFrame(data=settings['scaler'].transform(X),columns=X.columns,inde
 X_std_values = X_std.values
 X_train = X_train_std
 X_test = X_test_std
+
 
 #save out variables for later analysis
 X_std.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X_std.csv'))

@@ -7,6 +7,7 @@ Created on Tue Dec 19 14:33:19 2023
 import pandas as pd
 from atmos import calculate
 from sklearn.preprocessing import PolynomialFeatures
+import numpy as np
 
 def temp_C_2_K(data):
     #convert temp from celsius to kelvin
@@ -78,10 +79,70 @@ def fig_ratio(data):
     data['fig ratio'] = data['Fig2600'] / data['Fig2602']
     return data
 
+def binned_resample(X_train, y_train, n_bins):
+    downsampled_series_list = []
+    # Run on reference data
+    target_bin_multiplier = 2  #Target samples per bin is set as 1/n_bins. However, this can be adjusted if you don't want to remove so much data
+    # When target_bin_multiplier is 2, the target samples per bin is twice as much as the mean number of samples per bin. Less data will be removed this way.
+    bins, edges = np.histogram(y_train, bins=n_bins, density=False)
+
+    # Determine the desired number of samples per bin
+    target_samples_per_bin = round(target_bin_multiplier * len(y_train) // n_bins)
+
+    # Downsampling to ensure the same number of samples in each bin
+    rows_to_remove = []
+    for i in range(n_bins):
+        bin_indices = np.where((y_train >= edges[i]) & (y_train <= edges[i + 1]))[0]
+        if len(bin_indices) > target_samples_per_bin:
+            # If more samples in the bin than the target, randomly select samples
+            selected_indices = np.random.choice(bin_indices, size=target_samples_per_bin, replace=False)
+            selected_values = y_train.iloc[selected_indices]
+            downsampled_series_list.append(selected_values)
+            # Save indices to remove from the DataFrame
+            rows_to_remove.extend(bin_indices[~np.isin(bin_indices, selected_indices)])
+        else:
+            # If fewer samples, include all samples in the bin
+            downsampled_series_list.append(y_train.iloc[bin_indices])
+
+    # Concatenate the downsampled Series into a single Series
+    y_selected = pd.concat(downsampled_series_list) #y selected is shuffled!
+    y_selected = y_selected.sort_index()
+    # Remove rows from df_to_remove based on the indices removed during downsampling
+    #X_selected = X_train.drop(index=X_train.index[rows_to_remove])
+    X_selected = np.delete(X_train, rows_to_remove, axis=0) #X selected is not!!! this is causing model fit problems.
+
+    return X_selected, y_selected
+
+def resample_quartile(X_train, y_train, quartile, downsampling_rate):
+
+    quartiles = pd.DataFrame({'Lower':[0, 0.25, 0.5, 0.75],
+                              'Upper': [0.25, 0.5, 0.75, 1]},
+                             index = ['first','second','third','fourth'])
+
+    upper_edge = y_train.quantile(quartiles['Upper'].loc[quartile])
+    lower_edge = y_train.quantile(quartiles['Lower'].loc[quartile])
+    quartile_filter = (y_train < upper_edge) & (y_train >= lower_edge)
+
+    quartile_indices = y_train[quartile_filter].index
+
+    # Calculate the number of instances to keep
+    num_instances_to_remove = int(len(quartile_indices) * (1-downsampling_rate))
+
+    # Randomly sample instances to keep
+    removed_quartile_indices = np.random.choice(quartile_indices, size=num_instances_to_remove,
+                                                          replace=False)
+
+    # Create the downsampled dataset
+    y_selected = y_train.drop(index=removed_quartile_indices)
+    X_selected = X_train.drop(index=removed_quartile_indices)
+
+    return X_selected, y_selected
+    # Now, 'downsampled_df' represents the dataset with downsampled lower quartile values
+
 def preprocessing_func(data, sensors_included, t_warmup, preprocess):
      #change 999 to NA
      data.replace(999, pd.NA, inplace=True)
-     
+
      #make sure all columns are numeric to avoid errors later:
      for col in data:
          data[col] = pd.to_numeric(data[col], errors='coerce').astype(float)

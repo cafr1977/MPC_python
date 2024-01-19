@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Qt5Agg')
+
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -32,7 +35,7 @@ def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollut
     plt.tight_layout()
 
     # Show the plot
-    plt.show()
+    plt.show(block=False)
 
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'ref_colo_timeseries.png'))
@@ -121,7 +124,7 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
     plt.tight_layout()
 
     # Show the plot
-    plt.show()
+    plt.show(block=False)
 
     # save plot in outputs folder
     plt.savefig(os.path.join('Outputs', output_folder_name, 'colo_model_statistics.png'))
@@ -158,7 +161,7 @@ def colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant
     plt.tight_layout()
 
     # Show the plot
-    plt.show()
+    plt.show(block=False)
 
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'ref_vs_pred_scatter.png'))
@@ -205,7 +208,7 @@ def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train,
     plt.tight_layout()
 
     # Show the plot
-    plt.show()
+    plt.show(block=False)
 
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'colo_residual.png'))
@@ -225,7 +228,7 @@ def field_boxplot(data, model_name, output_folder_name, colo_output_folder, poll
     plt.xlabel('Pod site')
     plt.ylabel(pollutant + ' Concentration (' + unit + ')')
 
-    plt.show()
+    plt.show(block=False)
     # Save the boxplot as an image file
     plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, model_name + '_field_prediction_boxplot.png'))
 
@@ -242,7 +245,7 @@ def field_timeseries(data, model_name, output_folder_name, colo_output_folder, p
     plt.xlabel('Datetime')
     plt.ylabel(pollutant + ' Concentration (' + unit + ')')
 
-    plt.show()
+    plt.show(block=False)
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name,
                              model_name + '_field_prediction_timeseries.png'))
@@ -280,7 +283,7 @@ def harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, outp
     fig.subplots_adjust(bottom=0.1)
 
     # Show the plot
-    plt.show()
+    plt.show(block=False)
 
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, '_harmon_timeseries.png'))
@@ -323,7 +326,7 @@ def harmon_scatter(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_
     plt.tight_layout()
 
     # Show the plot
-    plt.show()
+    plt.show(block=False)
 
     # Save the plot as an image file
     fig.subplots_adjust(bottom=0.1)
@@ -358,7 +361,7 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     for ax in stat_plot.axes[:, 0]:
         ax.set_ylim(0, 1.2)
 
-    plt.show()
+    plt.show(block=False)
 
     # Save the FacetGrid as an image file
     stat_plot.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmonization_stats.png'))
