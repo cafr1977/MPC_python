@@ -57,8 +57,9 @@ settings['test_percentage'] = 0.2 #what percentage of data goes into the test se
 settings['traintest_split_type'] = 'mid_end_split' #how the data is split into train and test
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
+settings['colo_plot_list'] = ['colo_timeseries', 'colo_stats_plot'] # plots to plot and save
 
-settings['models']=['lin_reg', 'lin_reg_weighted'] #which models are run on the data
+settings['models']=['random_forest', 'random_forest_qw','random_forest_kde_w'] #which models are run on the data
 #'lin_reg','random_forest','lasso','ridge'
 
 settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
@@ -76,7 +77,7 @@ settings['quartiles_to_resample'] = ['first','second']   ##which quantiles you w
 settings['quartiles_downsampling_rate'] = 0.7   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
 settings['n_bins']= 5   ## If using binned_resample, choose how many bins to split the data into.
 
-settings['colo_plot_list'] = ['colo_timeseries', 'colo_stats_plot'] # plots to plot and save
+
 
 #Column_names is a dictionary of column names lists that will be applied to pod data.
 # The name of the list corresponds to the deployment log "header_type" column
@@ -263,6 +264,7 @@ X.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X.csv'))
 del y, X, X_train_std, X_test_std
 
 ####Begin running models
+if
 
 #first, establish a dataframe to save model statistics in
 model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
@@ -274,7 +276,7 @@ for i, model_name in enumerate(settings['models']):
     # Get the function from the module
     model_func = getattr(model_module, model_name)
     # Call the function to apply the model_name model
-    model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = model_func(X_train, y_train, X_test, y_test,X_std_values,model_name,settings['pollutant'],output_folder_name,model_stats)
+    model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = model_func(X_train, y_train, X_test, y_test,X_std_values,model_name,model_stats)
 
     #save out the model and the y predicted 
     y_predicted = pd.DataFrame(data = y_predicted, columns = [settings['pollutant']], index = X_std.index)

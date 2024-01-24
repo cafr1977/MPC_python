@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('Qt5Agg')
+#matplotlib.use('Qt5Agg')
 
 import os
 import matplotlib.pyplot as plt
@@ -43,6 +43,7 @@ def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollut
     # Example usage:
     # model_reference_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, 'Pollutant', 'ModelName', 'OutputFolderName')
 def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name):
+    #settings['models'], model_stats, settings['pollutant'],output_folder_name, settings['colo_run_name']
     # plot RMSE, MBE, and R2 of each model
     # x = np.arange(len(models))  # the label locations
 
@@ -61,18 +62,18 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
     # ax[0].set_title('Training and Testing RMSE for Each Model')
     ax[0].set_ylabel('RMSE')
     ax[0].set_xticks(np.arange(len(model_stats)) + bar_width / 2)
-    ax[0].set_xticklabels(models)
+    ax[0].set_xticklabels(models, rotation=45, ha='right')
 
     # Add value labels on top of each bar
-    for rect in rects1 + rects2:
+    for rect in rects2:
         height = rect.get_height()
         ax[0].text(rect.get_x() + rect.get_width() / 2, height,
-                   f'{height:.2f}', ha='center', va='bottom')
+                    f'{height:.1f}', ha='center', va='bottom')
 
-    # ax[0].set_title('Training and Testing RMSE for Each Model')
-    ax[0].set_ylabel('RMSE')
-    ax[0].set_xticks(np.arange(len(model_stats)) + bar_width / 2)
-    ax[0].set_xticklabels(models)
+    for rect in rects1:
+        height = rect.get_height()
+        ax[0].text(rect.get_x() + rect.get_width() / 2, height/2,
+                    f'{height:.1f}', ha='center', va='bottom')
 
     # next subplot: Bar plot of training R2
     rects3 = ax[1].bar(np.arange(len(model_stats)), model_stats['Training_R2'], bar_width,
@@ -80,7 +81,7 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
 
     ax[1].set_ylabel('R2')
     ax[1].set_xticks(np.arange(len(model_stats)))
-    ax[1].set_xticklabels(models)
+    ax[1].set_xticklabels(models, rotation=45, ha='right')
 
     # Add value labels on top of each bar
     for rect in rects3:
@@ -97,14 +98,19 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
                        label='Testing MBE', color='orange', alpha=opacity)
 
     # Add value labels on top of each bar
-    for rect in rects4 + rects5:
+    for rect in rects5:
         height = rect.get_height()
         ax[2].text(rect.get_x() + rect.get_width() / 2, height,
-                   f'{height:.2f}', ha='center', va='bottom')
+                    f'{height:.1f}', ha='center', va='bottom')
+
+    for rect in rects4:
+        height = rect.get_height()
+        ax[2].text(rect.get_x() + rect.get_width() / 2, height/2,
+                    f'{height:.1f}', ha='center', va='bottom')
 
     ax[2].set_ylabel('MBE')
-    ax[2].set_xticks(np.arange(len(model_stats)) + bar_width / 2)
-    ax[2].set_xticklabels(models)
+    ax[2].set_xticks(np.arange(len(models)) + bar_width / 2)
+    ax[2].set_xticklabels(models, rotation=45, ha='right')
 
     # set the y axis so that it is symmetrically around zero
     # Get the current y-axis limits
@@ -113,12 +119,12 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
     ax[2].set_ylim(-abs_max, abs_max)
 
     # Move the legend outside the plot
-    ax[0].legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
-    ax[1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.15))
-    ax[2].legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=2)
+    ax[0].legend(loc='upper center', bbox_to_anchor=(0.5, 1.25), ncol=2)
+    ax[1].legend(loc='upper center',bbox_to_anchor=(0.5, 1.25))
+    ax[2].legend(loc='upper center', bbox_to_anchor=(0.5, 1.25), ncol=2)
 
     # set overall figure title
-    fig.suptitle(run_name + ' ' + pollutant)
+    fig.suptitle(run_name + ' ' + pollutant, y=0.9)
 
     # Adjust layout for better spacing
     plt.tight_layout()
