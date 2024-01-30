@@ -376,3 +376,17 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     # Example usage:
     # harmon_stats_plot(model_stats, 'OutputFolderName', 'ColoOutputFolder', 'SensorsIncluded')
 
+def colo_plots_series(colo_plot_list, y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name, colo_run_name):
+# plotting of modelled data
+    if 'colo_timeseries' in colo_plot_list:
+        colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant,
+                                        model_name, output_folder_name, colo_run_name)
+
+    if 'colo_scatter' in colo_plot_list:
+        colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant,
+                                    model_name, output_folder_name, colo_run_name)
+
+    if 'colo_residual' in colo_plot_list:
+        colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test,
+                                    pollutant, model_name, output_folder_name, X_std.columns,
+                                    colo_run_name)

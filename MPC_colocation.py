@@ -32,7 +32,7 @@ from Python_Functions import preprocessing_func
 from Python_Functions import test_train_split_func
 from Python_Functions import data_loading_func
 from Python_Functions import plotting_func
-
+from Python_Functions import weighting_grid
 
 
 #########
@@ -48,21 +48,21 @@ settings['colo_run_name'] = ''  #Name of the outputs file. If you leave it blank
 settings['ref_file_name'] = 'InnerPort_101023_122023_voc' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
 settings['pollutant']='TVOC' #make sure this matches the column name in the reference data file (CSV or XLSX)
 settings['unit'] = 'ppb' #concentration units of the target pollutant (for plot labels)
-settings['time_interval'] = 15 #time averaging in minutes. needs to be at least as high as the time resolution of the data
+settings['time_interval'] = 30 #time averaging in minutes. needs to be at least as high as the time resolution of the data
 settings['retime_calc'] = "median" #How the time averaging is calculated. Options are median and mean right now and are the same for pod and ref
 settings['sensors_included'] = ['Temperature','Humidity','Fig2600','Fig2602','Fig3','Fig4']
 settings['scaler'] = StandardScaler() #How the data is scaled. StandardScaler is mean zero and st dev 1
 settings['t_warmup'] = 45 #warm up period in minutes 
 settings['test_percentage'] = 0.2 #what percentage of data goes into the test set, usually 0.2 or 0.3
-settings['traintest_split_type'] = 'mid_end_split' #how the data is split into train and test
+settings['traintest_split_type'] = 'end_test' #how the data is split into train and test
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
-settings['colo_plot_list'] = ['colo_timeseries', 'colo_stats_plot'] # plots to plot and save
+settings['colo_plot_list'] = ['colo_timeseries', 'colo_stats_plot','colo_scatter'] # plots to plot and save
 
-settings['models']=['random_forest', 'random_forest_qw','random_forest_kde_w'] #which models are run on the data
+settings['models']=['lin_reg','lasso','ridge','random_forest','adaboost'] #which models are run on the data
 #'lin_reg','random_forest','lasso','ridge'
 
-settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
+settings['preprocess'] = ["hum_rel_2_abs","temp_C_2_K","rmv_warmup"]
 # temp_C_2_K": converts temperature from C to K, required for HumRel2Abs to run
 #hum_rel_2_abs: converts humidity from relative to absolute
 #rmv_warmup: Removes the first 45 minutes of data, as well as 45 minutes of data after the pod cuts out for more than 10 min
@@ -76,8 +76,8 @@ settings['preprocess'] = ["temp_C_2_K","hum_rel_2_abs","rmv_warmup"]
 settings['quartiles_to_resample'] = ['first','second']   ##which quantiles you want to downsample from if applying 'downsample_quant' in 'preprocess
 settings['quartiles_downsampling_rate'] = 0.7   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
 settings['n_bins']= 5   ## If using binned_resample, choose how many bins to split the data into.
-
-
+settings['qw_tuning_percentile'] = [80,95] #ONLY for tuning.
+settings['qw_tuning_weight'] = [3,8]
 
 #Column_names is a dictionary of column names lists that will be applied to pod data.
 # The name of the list corresponds to the deployment log "header_type" column
@@ -107,6 +107,10 @@ settings['column_names'] = {'3.1.0':
 if 'resample_quant1' in settings['preprocess'] and 'binned_resample' in settings['preprocess']:
     raise ValueError("binned_resample and resample_quant1 are both present in settings['preprocess']."
                      "Only one resample technique is allowed.")
+
+### if rf_qw_tuned in models, then it should be the only model!
+if 'rf_qw_tuned' in settings['models'] and len(settings['models']) != 1:
+    raise ValueError("rf_qw_tuned must be used alone in settings['models']. You must test other models separately.")
 
 
 #Create output folder
@@ -264,34 +268,57 @@ X.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X.csv'))
 del y, X, X_train_std, X_test_std
 
 ####Begin running models
-if
+if settings['models']== ['rf_qw_tuned']:
+    # first, establish a dataframe to save model statistics in
+    model_stats = pd.DataFrame(columns=['Training_R2', 'Training_RMSE', 'Testing_RMSE', 'Training_MBE', 'Testing_MBE'])
 
-#first, establish a dataframe to save model statistics in
-model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
-#models_folder = "Python_Functions." + "models"
-for i, model_name in enumerate(settings['models']):
-    print(f'Fitting colocation pod data to reference data using model {model_name}...')
-    # Import the module dynamically
-    model_module = importlib.import_module('Python_Functions.colo_model_func')
-    # Get the function from the module
-    model_func = getattr(model_module, model_name)
-    # Call the function to apply the model_name model
-    model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = model_func(X_train, y_train, X_test, y_test,X_std_values,model_name,model_stats)
+    for p in settings['qw_tuning_percentile']:
+        for w in settings['qw_tuning_weight']:
+            p_str = str(p)
+            w_str = str(w)
+            model_name = f'rf_p_{p_str}_w_{w_str}'
+            # Appending an empty row to model stats with the model name index
+            model_stats.loc[model_name] = [None] * len(model_stats.columns)
+            print(f'Fitting colocation pod data to reference data using weighted random forest with p= {p_str} and w= {w_str}...')
+            model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.rf_qw_tuned(X_train, y_train,
+                                                                                                       X_test, y_test,
+                                                                                                       X_std, p,
+                                                                                                       w, model_name,
+                                                                                                       model_stats)
 
-    #save out the model and the y predicted 
-    y_predicted = pd.DataFrame(data = y_predicted, columns = [settings['pollutant']], index = X_std.index)
-    y_predicted.to_csv(os.path.join('Outputs', output_folder_name, f'{model_name}_colo_y_predicted.csv'))
-    joblib.dump(current_model, os.path.join('Outputs', output_folder_name, f'{model_name}_model.joblib'))
-     
-#plotting of modelled data
-    if 'colo_timeseries' in settings['colo_plot_list']:
-        plotting_func.colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name, output_folder_name, settings['colo_run_name'])
-        
-    if 'colo_scatter' in settings['colo_plot_list']:
-        plotting_func.colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name, output_folder_name, settings['colo_run_name'])
-        
-    if 'colo_residual' in settings['colo_plot_list']:
-       plotting_func.colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test, settings['pollutant'], model_name, output_folder_name,X_std.columns, settings['colo_run_name'])
+            # save out the model and the y predicted
+            y_predicted = pd.DataFrame(data=y_predicted, columns=[settings['pollutant']], index=X_std.index)
+            y_predicted.to_csv(os.path.join('Outputs', output_folder_name, f'{model_name}_colo_y_predicted.csv'))
+            joblib.dump(current_model, os.path.join('Outputs', output_folder_name, f'{model_name}_model.joblib'))
+
+            plotting_func.colo_plots_series(settings['colo_plot_list'], y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name,
+                      output_folder_name, settings['colo_run_name'])
+
+    #reset the models list so it includes each combo of p and w
+    settings['models'] = list(model_stats.index)
+
+else:
+    #first, establish a dataframe to save model statistics in
+    model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
+    #models_folder = "Python_Functions." + "models"
+    for i, model_name in enumerate(settings['models']):
+        print(f'Fitting colocation pod data to reference data using model {model_name}...')
+        # Import the module dynamically
+        model_module = importlib.import_module('Python_Functions.colo_model_func')
+        # Get the function from the module
+        model_func = getattr(model_module, model_name)
+        # Call the function to apply the model_name model
+        model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = model_func(X_train, y_train, X_test, y_test,X_std_values,model_name,model_stats)
+
+        #save out the model and the y predicted
+        y_predicted = pd.DataFrame(data = y_predicted, columns = [settings['pollutant']], index = X_std.index)
+        y_predicted.to_csv(os.path.join('Outputs', output_folder_name, f'{model_name}_colo_y_predicted.csv'))
+        joblib.dump(current_model, os.path.join('Outputs', output_folder_name, f'{model_name}_model.joblib'))
+
+    #plotting of modelled data
+        plotting_func.colo_plots_series(settings['colo_plot_list'], y_train, y_train_predicted, y_test,
+                                        y_test_predicted, settings['pollutant'], model_name,
+                                        output_folder_name, settings['colo_run_name'])
 
 #save out the model for later analysis and use in field data
 model_stats.to_csv(os.path.join('Outputs', output_folder_name, 'colo_model_stats.csv'), index = True)
