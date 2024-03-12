@@ -59,13 +59,14 @@ def load_data(data_file_list, deployment_log, column_names, deployment_type, pol
         pod_data = pd.DataFrame()
 
     for i, file in enumerate(data_file_list):
+        print(f'Importing {file}')
         # get the correct column names list based on the "header_type" in deployment log
         if deployment_type == 'C':
             header_type = deployment_log[(deployment_log['deployment'] == 'C') & (deployment_log['pollutant'] == pollutant)]['header_type'].to_string(index=False)
         else:
             header_type = deployment_log[deployment_log['file_name'] == file]['header_type'].to_string(index=False)
         if header_type not in column_names:
-            raise KeyError("Header type in deployment log does not match any column names options")
+            raise KeyError(f"Header type {header_type} in deployment log does not match any column names options")
 
         # read the individual data file (to be combined after correcting the datetime)
         if os.path.exists(os.path.join(data_path, f'{file}.txt')):

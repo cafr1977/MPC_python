@@ -25,13 +25,13 @@ hf_set = {}
 
 ####
 #edit the variables in this section for the harmonization - field run
-colo_output_folder = 'Output_240109132423' #the code will pull the best_model from this, and also save new stuff into it
+colo_output_folder = 'Output_Oct2Dec_Reference_CH4_RFQWTuned' #the code will pull the best_model from this, and also save new stuff into it
 hf_set['run_field'] = True    #True if you want to apply calibration to field data,
                                     #False if you only want to look at harmonization data
-hf_set['best_model'] = 'lin_reg'    #model that you would like to apply to field data from the output_folder
+hf_set['best_model'] = 'rf_p_95_w_10'    #model that you would like to apply to field data from the output_folder
 hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
-hf_set['field_plot_list'] = ['field_timeseries','field_boxplot'] #field plots
-hf_set['harmon_plot_list'] = ['harmon_scatter','harmon_stats_plot','harmon_timeseries'] #harmonization plots
+hf_set['field_plot_list'] = ['field_boxplot','field_timeseries'] #field plots
+hf_set['harmon_plot_list'] = [] #harmonization plots
 ####
 
 ###############
@@ -79,7 +79,7 @@ if not isinstance(colo_pod_name, str): #first check that colo_pod_name is a stri
 print('Loading harmonization pod data...')
 pod_harmonization_data = data_loading_func.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'])
 
-# Check if there is any field data
+# Check if there is any harmonization data
 assert bool(pod_harmonization_data), "No harmonization data was found in the Harmonization folder that matched the deployment log. Stopping execution."
 
 print('Preprocessing harmonization pod and reference data...')
@@ -295,7 +295,7 @@ elif settings['run_field'] == True:
     with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
         # Iterate through the dictionary and write each DataFrame to a sheet
         for sheet_name, df in Y_field_dict.items():
-            df.to_excel(writer, sheet_name=sheet_name,index=False)
+            df.to_excel(writer, sheet_name=sheet_name)
             
     #save y_field data by location
     # Split y_field_df into a dictionary based on the 'location' column
@@ -304,14 +304,14 @@ elif settings['run_field'] == True:
     with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
         # Iterate through the dictionary and write each DataFrame to a sheet
         for sheet_name, df in Y_field_loc_dict.items():
-            df.to_excel(writer, sheet_name=sheet_name,index=False)    
+            df.to_excel(writer, sheet_name=sheet_name)
     
     #save X_field data
     excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_field.xlsx')
     with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
         # Iterate through the dictionary and write each DataFrame to a sheet
         for sheet_name, df in X_fitted_field.items(): 
-            df.to_excel(writer, sheet_name=sheet_name,index=False)
+            df.to_excel(writer, sheet_name=sheet_name)
     
     #save X_field_standardized data
     excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_field_standardized.xlsx')
@@ -320,14 +320,14 @@ elif settings['run_field'] == True:
     with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
         # Iterate through the dictionary and write each DataFrame to a sheet
         for sheet_name, df in X_fitted_field_std.items():
-            df.to_excel(writer, sheet_name=sheet_name,index=False)
+            df.to_excel(writer, sheet_name=sheet_name)
         
 #save preprocessed harmonization pod data
 excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_preprocessed_unfitted.xlsx')
 with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
     # Iterate through the dictionary and write each DataFrame to a sheet
     for sheet_name, df in preprocessed_harmon_data.items():
-        df.to_excel(writer, sheet_name=sheet_name,index=False)
+        df.to_excel(writer, sheet_name=sheet_name)
 
 
 #save fitted harmonization pod data
@@ -335,7 +335,7 @@ excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_
 with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
     # Iterate through the dictionary and write each DataFrame to a sheet
     for sheet_name, df in pod_fitted.items():
-        df.to_excel(writer, sheet_name=sheet_name,index=False)
+        df.to_excel(writer, sheet_name=sheet_name)
 
 #save colocation pod harmonization data
 colo_pod_harmon_data.to_excel(os.path.join('Outputs', colo_output_folder, output_folder_name, 'colo_pod_harmon_data.xlsx'))

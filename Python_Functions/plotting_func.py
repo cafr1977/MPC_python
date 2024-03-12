@@ -1,5 +1,5 @@
 import matplotlib
-#matplotlib.use('Qt5Agg')
+matplotlib.use('Qt5Agg')
 
 import os
 import matplotlib.pyplot as plt
@@ -9,25 +9,26 @@ import copy
 import pandas as pd
 
 #Colocation plots
-def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name,run_name):
+def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name,run_name, unit):
     # Set the figure size
     plt.figure(figsize=(12, 4))
 
     # Scatter plot for actual (training) values
-    plt.scatter(y_train.index, y_train, label='Actual (Training)', color='blue', marker='.')
+    plt.scatter(y_train.index, y_train, label='Actual (Training)', color='gray', marker='.')
 
     # Scatter plot for predicted (training) values
-    plt.scatter(y_train.index, y_train_predicted, label='Predicted (Training)', color='darkorange', marker='.')
+    plt.scatter(y_train.index, y_train_predicted, label='Predicted (Training)', color='blue', marker='.')
 
     # Scatter plot for actual (test) values
-    plt.scatter(y_test.index, y_test, label='Actual (Test)', color='lightblue', marker='.')
+    plt.scatter(y_test.index, y_test, label='Actual (Test)', color='gray', marker='.')
 
     # Scatter plot for predicted (test) values
-    plt.scatter(y_test.index, y_test_predicted, label='Predicted (Test)', color='gold', marker='.')
+    plt.scatter(y_test.index, y_test_predicted, label='Predicted (Test)', color='lightblue', marker='.')
 
     # Set the title of the plot
     plt.title(run_name + ' ' + pollutant + ' ' + model_name + ' - Actual vs Predicted')
-
+    plt.ylabel(pollutant + ' conc. (' + unit + ')')
+    plt.xlabel('Date')
     # Add a legend to the plot
     plt.legend()
 
@@ -57,7 +58,7 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
 
     # Bar plot for testing RMSE
     rects2 = ax[0].bar(np.arange(len(model_stats)) + bar_width, model_stats['Testing_RMSE'], bar_width,
-                       label='Testing RMSE', color='orange', alpha=opacity)
+                       label='Testing RMSE', color='lightblue', alpha=opacity)
 
     # ax[0].set_title('Training and Testing RMSE for Each Model')
     ax[0].set_ylabel('RMSE')
@@ -95,7 +96,7 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
 
     # Bar plot for testing MBE
     rects5 = ax[2].bar(np.arange(len(model_stats)) + bar_width, model_stats['Testing_MBE'], bar_width,
-                       label='Testing MBE', color='orange', alpha=opacity)
+                       label='Testing MBE', color='lightblue', alpha=opacity)
 
     # Add value labels on top of each bar
     for rect in rects5:
@@ -269,7 +270,7 @@ def harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, outp
         # Iterate over each key in pod_fitted
         for key in pod_fitted:
             # Scatter plot for fitted values for each key
-            axs[i].scatter(colo_pod_harmon_data.index, pod_fitted[key][sensor], label=key, marker='.')
+            axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.')
 
         # Plot the actual values for the sensor
         axs[i].plot(colo_pod_harmon_data.index, colo_pod_harmon_data[sensor], color='k')
@@ -376,11 +377,11 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     # Example usage:
     # harmon_stats_plot(model_stats, 'OutputFolderName', 'ColoOutputFolder', 'SensorsIncluded')
 
-def colo_plots_series(colo_plot_list, y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name, colo_run_name):
+def colo_plots_series(colo_plot_list, y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name, colo_run_name,unit):
 # plotting of modelled data
     if 'colo_timeseries' in colo_plot_list:
         colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant,
-                                        model_name, output_folder_name, colo_run_name)
+                                        model_name, output_folder_name, colo_run_name, unit)
 
     if 'colo_scatter' in colo_plot_list:
         colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant,

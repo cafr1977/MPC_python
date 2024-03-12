@@ -43,26 +43,26 @@ settings={}
 plt.close('all')
 
 #Variable to change for your analysis
-settings['colo_run_name'] = ''  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
+settings['colo_run_name'] = 'NO_HP_rf_tuned_5min'  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
 # ^^ If you want the outputs folder to just be named with current name, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-settings['ref_file_name'] = 'InnerPort_101023_122023_voc' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
-settings['pollutant']='TVOC' #make sure this matches the column name in the reference data file (CSV or XLSX)
-settings['unit'] = 'ppb' #concentration units of the target pollutant (for plot labels)
-settings['time_interval'] = 30 #time averaging in minutes. needs to be at least as high as the time resolution of the data
+settings['ref_file_name'] = 'minutely_HP_OctNov' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
+settings['pollutant']='NO' #make sure this matches the column name in the reference data file (CSV or XLSX)
+settings['unit'] = 'ppm' #concentration units of the target pollutant (for plot labels)
+settings['time_interval'] = 5 #time averaging in minutes. needs to be at least as high as the time resolution of the data
 settings['retime_calc'] = "median" #How the time averaging is calculated. Options are median and mean right now and are the same for pod and ref
-settings['sensors_included'] = ['Temperature','Humidity','Fig2600','Fig2602','Fig3','Fig4']
+settings['sensors_included'] = ['Temperature','Humidity',"Quad1C1", "Quad1C2","Quad1C3","Quad1C4", "Quad2C1", "Quad2C2"]
 settings['scaler'] = StandardScaler() #How the data is scaled. StandardScaler is mean zero and st dev 1
-settings['t_warmup'] = 45 #warm up period in minutes 
+settings['t_warmup'] = 45 #warm up period in minutes
 settings['test_percentage'] = 0.2 #what percentage of data goes into the test set, usually 0.2 or 0.3
 settings['traintest_split_type'] = 'end_test' #how the data is split into train and test
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
 settings['colo_plot_list'] = ['colo_timeseries', 'colo_stats_plot','colo_scatter'] # plots to plot and save
 
-settings['models']=['lin_reg','lasso','ridge','random_forest','adaboost'] #which models are run on the data
-#'lin_reg','random_forest','lasso','ridge'
+settings['models']=['rf_qw_tuned'] #which models are run on the data
+#'lin_reg','lasso','ridge','random_forest','adaboost'
 
-settings['preprocess'] = ["hum_rel_2_abs","temp_C_2_K","rmv_warmup"]
+settings['preprocess'] = ["rmv_warmup",'hum_rel_2_abs','temp_C_2_K']
 # temp_C_2_K": converts temperature from C to K, required for HumRel2Abs to run
 #hum_rel_2_abs: converts humidity from relative to absolute
 #rmv_warmup: Removes the first 45 minutes of data, as well as 45 minutes of data after the pod cuts out for more than 10 min
@@ -73,11 +73,11 @@ settings['preprocess'] = ["hum_rel_2_abs","temp_C_2_K","rmv_warmup"]
 #Preprocessing time sort, remove NaN, remove 999 are done automatically to avoid errors.
 
 #Sub settings for some preprocessing functions
-settings['quartiles_to_resample'] = ['first','second']   ##which quantiles you want to downsample from if applying 'downsample_quant' in 'preprocess
-settings['quartiles_downsampling_rate'] = 0.7   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
+settings['quartiles_to_resample'] = ['first']   ##which quantiles you want to downsample from if applying 'downsample_quant' in 'preprocess
+settings['quartiles_downsampling_rate'] = 0.6   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
 settings['n_bins']= 5   ## If using binned_resample, choose how many bins to split the data into.
-settings['qw_tuning_percentile'] = [80,95] #ONLY for tuning.
-settings['qw_tuning_weight'] = [3,8]
+settings['qw_tuning_percentile'] = [90,98] #ONLY for tuning.
+settings['qw_tuning_weight'] = [5,10]
 
 #Column_names is a dictionary of column names lists that will be applied to pod data.
 # The name of the list corresponds to the deployment log "header_type" column
@@ -292,7 +292,7 @@ if settings['models']== ['rf_qw_tuned']:
             joblib.dump(current_model, os.path.join('Outputs', output_folder_name, f'{model_name}_model.joblib'))
 
             plotting_func.colo_plots_series(settings['colo_plot_list'], y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name,
-                      output_folder_name, settings['colo_run_name'])
+                      output_folder_name, settings['colo_run_name'],settings['unit'])
 
     #reset the models list so it includes each combo of p and w
     settings['models'] = list(model_stats.index)
@@ -318,7 +318,7 @@ else:
     #plotting of modelled data
         plotting_func.colo_plots_series(settings['colo_plot_list'], y_train, y_train_predicted, y_test,
                                         y_test_predicted, settings['pollutant'], model_name,
-                                        output_folder_name, settings['colo_run_name'])
+                                        output_folder_name, settings['colo_run_name'], settings['unit'])
 
 #save out the model for later analysis and use in field data
 model_stats.to_csv(os.path.join('Outputs', output_folder_name, 'colo_model_stats.csv'), index = True)
