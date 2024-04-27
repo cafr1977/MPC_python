@@ -18,6 +18,7 @@ from sklearn.preprocessing import StandardScaler  #pip install scikit-learn
 from datetime import datetime
 import importlib
 import joblib
+import seaborn as sns
 
 # Other packages that must be installed prior to running:
 # atmos (for humidity conversion)
@@ -43,24 +44,25 @@ settings={}
 plt.close('all')
 
 #Variable to change for your analysis
-settings['colo_run_name'] = 'NO_HP_rf_tuned_5min'  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
+settings['colo_run_name'] = 'mike_randomforest_peakweight3'  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
 # ^^ If you want the outputs folder to just be named with current name, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-settings['ref_file_name'] = 'minutely_HP_OctNov' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
-settings['pollutant']='NO' #make sure this matches the column name in the reference data file (CSV or XLSX)
-settings['unit'] = 'ppm' #concentration units of the target pollutant (for plot labels)
-settings['time_interval'] = 5 #time averaging in minutes. needs to be at least as high as the time resolution of the data
+settings['ref_file_name'] = 'TVOC_editeddata_101023_031824' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
+settings['pollutant']='TVOC' #make sure this matches the column name in the reference data file (CSV or XLSX)
+settings['unit'] = 'ppb' #concentration units of the target pollutant (for plot labels)
+settings['time_interval'] = 5 #time averaging in minutes. needs to be at least as high as the time resolution of the reference data
 settings['retime_calc'] = "median" #How the time averaging is calculated. Options are median and mean right now and are the same for pod and ref
-settings['sensors_included'] = ['Temperature','Humidity',"Quad1C1", "Quad1C2","Quad1C3","Quad1C4", "Quad2C1", "Quad2C2"]
+settings['sensors_included'] = ["Fig2600","Fig2602","Fig3","Fig4",'Temperature','Humidity']
 settings['scaler'] = StandardScaler() #How the data is scaled. StandardScaler is mean zero and st dev 1
-settings['t_warmup'] = 45 #warm up period in minutes
+settings['t_warmup'] = 120 #warm up period in minutes
 settings['test_percentage'] = 0.2 #what percentage of data goes into the test set, usually 0.2 or 0.3
-settings['traintest_split_type'] = 'end_test' #how the data is split into train and test
+settings['traintest_split_type'] = 'mid_end_split' #how the data is split into train and test
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
-settings['colo_plot_list'] = ['colo_timeseries', 'colo_stats_plot','colo_scatter'] # plots to plot and save
+settings['colo_plot_list'] = ['colo_timeseries','colo_scatter', 'colo_stats_plot','colo_residual'] # plots to plot and save
 
 settings['models']=['rf_qw_tuned'] #which models are run on the data
-#'lin_reg','lasso','ridge','random_forest','adaboost'
+#'lin_reg','lasso','ridge','random_forest','adaboost', 'gradboost', 'svr_'
+#rf_qw_tuned
 
 settings['preprocess'] = ["rmv_warmup",'hum_rel_2_abs','temp_C_2_K']
 # temp_C_2_K": converts temperature from C to K, required for HumRel2Abs to run
@@ -71,13 +73,15 @@ settings['preprocess'] = ["rmv_warmup",'hum_rel_2_abs','temp_C_2_K']
 #binned_resample:
 #resample_quartile:
 #Preprocessing time sort, remove NaN, remove 999 are done automatically to avoid errors.
+#"rmv_negative_CO_aux": Filters out negative CO values (not clear why they are occuring)
+#interaction_terms
 
 #Sub settings for some preprocessing functions
 settings['quartiles_to_resample'] = ['first']   ##which quantiles you want to downsample from if applying 'downsample_quant' in 'preprocess
 settings['quartiles_downsampling_rate'] = 0.6   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
 settings['n_bins']= 5   ## If using binned_resample, choose how many bins to split the data into.
-settings['qw_tuning_percentile'] = [90,98] #ONLY for tuning.
-settings['qw_tuning_weight'] = [5,10]
+settings['qw_tuning_percentile'] = [99.5,99.9] #ONLY for tuning.
+settings['qw_tuning_weight'] = [10, 15, 20]
 
 #Column_names is a dictionary of column names lists that will be applied to pod data.
 # The name of the list corresponds to the deployment log "header_type" column
@@ -85,17 +89,29 @@ settings['qw_tuning_weight'] = [5,10]
 #if you want to have data columns that are strings (text), discuss with caroline.
 settings['column_names'] = {'3.1.0':
                                 ["datetime", "Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater",
-                                 "Misc2611","PID", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity",
+                                 "PID","Mics2611", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity",
                                 "Quad1C1", "Quad1C2","Quad1C3","Quad1C4", "Quad2C1", "Quad2C2","Quad2C3","Quad2C4",
                                 "MQ131","PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
                                 "PM 25 um", "PM 50 um", "PM 100 um",'OPC1','OPC2','OPC3','OPC4','OPC5','WS_mph','WD','unk'],
 
-                            '3.2.0':
-                                ["datetime", "Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater",
-                                 "Misc2611","PID", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity",
+                            '3.1.2_opc':
+                                ["datetime", "Volts", "Fig2600", "Fig2602", "Fig3", "Fig3heater", "Fig4", "Fig4heater",
+                                 "PID","Mics2611", "CO_aux", "CO_main", "CO2",
+                                 "Temperature", "Pressure", "Humidity", "QS1_Aux", "QS1_Main", "QS2_Aux", "QS2_Main",
+                                 "QS3_Aux", "QS3_Main", "QS4_Aux", "QS4_Main", 'WS_mph', 'WD',
+                                 "MQ131", "PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
+                                 "PM 25 um", "PM 50 um", "PM 100 um", 'OPC_Bin1_', 'OPC_Bin2', 'OPC_Bin3', 'OPC_Bin4',
+                                 'OPC_Bin5', 'OPC_Bin6', 'OPC_Bin7', 'OPC_Bin8',
+                                 'OPC_Bin9', 'OPC_Bin10', 'OPC_Bin11', 'OPC_Bin12', 'OPC_Bin13', 'OPC_Bin14',
+                                 'OPC_Bin15', 'OPC_Bin16', 'OPC_SampPer',
+                                 'OPC_FlowRate', 'OPC_PM10_', 'OPC_PM25', 'OPC_PM100', 'unk']
+    ,
+                            '3.1.2':
+                                ["datetime","Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater",
+                                "PID", "Mics2611", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity", "Quad1C1", "Quad1C2","Quad1C3","Quad1C4",
+                                "Quad2C1", "Quad2C2","Quad2C3","Quad2C4",'WS_mph','WD',
                                 "MQ131","PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
-                                "PM 25 um", "PM 50 um", "PM 100 um"],
-
+                                "PM 25 um", "PM 50 um", "PM 100 um",'OPC1','OPC2','OPC3','OPC4','OPC5', 'unk']
 
                             }
 
@@ -142,8 +158,8 @@ if "add_time_elapsed" in settings['preprocess']:
 colo_file_list = deployment_log[(deployment_log['deployment']=='C') & (deployment_log['pollutant']==settings['pollutant'])]['file_name'] #list of all colo files to combine
 
 #make sure there just one colocation pod
-settings['colo_pod_name'] = [string.split('_')[0] for string in colo_file_list]
-if len(colo_file_list) == 0:
+settings['colo_pod_name'] = list(set([string.split('_')[0] for string in colo_file_list]))
+if len(settings['colo_pod_name']) == 0:
     raise KeyError('No colocation files listed in deployment log for given pollutant.')   
 if len(settings['colo_pod_name']) != 1:
     raise KeyError('Run cannot continue because there is more than one unique colocation pod listed in the deployment log for the pollutant of interest.')
@@ -201,6 +217,10 @@ ref_data.dropna(inplace=True)
 if not isinstance(settings['time_interval'], str): #first check that time_interval is a string
     settings['time_interval'] = str(settings['time_interval'])
 
+#remove any duplicate rows (based on time). This line will keep the first instance.
+colo_pod_data = colo_pod_data[~colo_pod_data.index.duplicated(keep='first')]
+ref_data = ref_data[~ref_data.index.duplicated(keep='first')]
+
 #time average and align the colocation and reference data
 print('Re-timing colocation pod and reference data...')
 if settings['retime_calc']=='median':
@@ -216,8 +236,26 @@ data_combined.dropna(inplace=True)
 if "add_time_elapsed" in settings['preprocess']:
     data_combined = preprocessing_func.add_time_elapsed(data_combined, settings['earliest_time'])
 
-if "fig_ratio" in settings['preprocess']:
-    data_combined = preprocessing_func.fig_ratio(data_combined)
+#'fig2600_2602_ratio', 'fig2600_3_ratio','fig4_2602_ratio','fig4_3_ratio'
+
+if 'fig2600_2602_ratio' in settings['preprocess']:
+    data_combined = preprocessing_func.fig2600_2602_ratio(data_combined)
+
+if 'fig2600_3_ratio' in settings['preprocess']:
+    data_combined = preprocessing_func.fig2600_3_ratio(data_combined)
+
+if 'fig3_2602_ratio' in settings['preprocess']:
+    data_combined = preprocessing_func.fig3_2602_ratio(data_combined)
+
+if 'fig4_2602_ratio' in settings['preprocess']:
+    data_combined = preprocessing_func.fig4_2602_ratio(data_combined)
+
+if 'fig4_3_ratio' in settings['preprocess']:
+    data_combined = preprocessing_func.fig4_3_ratio(data_combined)
+
+if 'corr_heatmap' in settings['colo_plot_list']:
+    plotting_func.corr_heatmap(data_combined, output_folder_name)
+
 
 #begin ML
 print('Initializing models...')
@@ -238,7 +276,10 @@ if settings['traintest_split_type'] == 'end_test':
 
 elif settings['traintest_split_type'] == 'mid_end_split':
     X_train, y_train, X_test, y_test = test_train_split_func.mid_end_split(settings['test_percentage'], X, y)
-    
+
+elif settings['traintest_split_type'] == 'start_end_split':
+    X_train, y_train, X_test, y_test = test_train_split_func.start_end_split(settings['test_percentage'], X, y)
+
 else: 
     raise KeyError('Invalid traintest_split_type, run is ended')
 
@@ -250,14 +291,18 @@ if "resample_quartile" in settings['preprocess']:
     for quartile in settings['quartiles_to_resample']:
         X_train, y_train = preprocessing_func.resample_quartile(X_train, y_train, quartile, settings['quartiles_downsampling_rate'])
 
+
 #Scale the data using the technique specified in "scaler"
 X_train_std = settings['scaler'].fit_transform(X_train)
 X_test_std = settings['scaler'].transform(X_test)
-X_std = pd.DataFrame(data=settings['scaler'].transform(X),columns=X.columns,index=X.index)
+X_std = pd.DataFrame(data=settings['scaler'].fit_transform(X),columns=X.columns,index=X.index)
 X_std_values = X_std.values
 X_train = X_train_std
 X_test = X_test_std
-
+'''
+X_std = X
+X_std_values = X_std.values
+'''
 
 #save out variables for later analysis
 X_std.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X_std.csv'))
@@ -268,9 +313,9 @@ X.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X.csv'))
 del y, X, X_train_std, X_test_std
 
 ####Begin running models
-if settings['models']== ['rf_qw_tuned']:
+if settings['models']== ['rf_qw_tuned'] or settings['models']== ['svr_qw_tuned']:
     # first, establish a dataframe to save model statistics in
-    model_stats = pd.DataFrame(columns=['Training_R2', 'Training_RMSE', 'Testing_RMSE', 'Training_MBE', 'Testing_MBE'])
+    model_stats = pd.DataFrame(columns=['Training_R2','Testing_R2', 'Training_RMSE', 'Testing_RMSE', 'Training_MBE', 'Testing_MBE'])
 
     for p in settings['qw_tuning_percentile']:
         for w in settings['qw_tuning_weight']:
@@ -279,12 +324,22 @@ if settings['models']== ['rf_qw_tuned']:
             model_name = f'rf_p_{p_str}_w_{w_str}'
             # Appending an empty row to model stats with the model name index
             model_stats.loc[model_name] = [None] * len(model_stats.columns)
-            print(f'Fitting colocation pod data to reference data using weighted random forest with p= {p_str} and w= {w_str}...')
-            model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.rf_qw_tuned(X_train, y_train,
+
+            if settings['models'] == ['rf_qw_tuned']:
+                print(f'Fitting colocation pod data to reference data using weighted random forest with p= {p_str} and w= {w_str}...')
+                model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.rf_qw_tuned(X_train, y_train,
                                                                                                        X_test, y_test,
                                                                                                        X_std, p,
                                                                                                        w, model_name,
                                                                                                        model_stats)
+            elif settings['models'] == ['svr_qw_tuned']:
+                print(f'Fitting colocation pod data to reference data using weighted SVR with p= {p_str} and w= {w_str}...')
+                model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.svr_qw_tuned(
+                    X_train, y_train,
+                    X_test, y_test,
+                    X_std, p,
+                    w, model_name,
+                    model_stats)
 
             # save out the model and the y predicted
             y_predicted = pd.DataFrame(data=y_predicted, columns=[settings['pollutant']], index=X_std.index)
@@ -292,14 +347,14 @@ if settings['models']== ['rf_qw_tuned']:
             joblib.dump(current_model, os.path.join('Outputs', output_folder_name, f'{model_name}_model.joblib'))
 
             plotting_func.colo_plots_series(settings['colo_plot_list'], y_train, y_train_predicted, y_test, y_test_predicted, settings['pollutant'], model_name,
-                      output_folder_name, settings['colo_run_name'],settings['unit'])
+                      output_folder_name, settings['colo_run_name'], settings['unit'], current_model, list(X_std.columns), X_train, X_test)
 
     #reset the models list so it includes each combo of p and w
     settings['models'] = list(model_stats.index)
 
 else:
     #first, establish a dataframe to save model statistics in
-    model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
+    model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Testing_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
     #models_folder = "Python_Functions." + "models"
     for i, model_name in enumerate(settings['models']):
         print(f'Fitting colocation pod data to reference data using model {model_name}...')
@@ -318,7 +373,10 @@ else:
     #plotting of modelled data
         plotting_func.colo_plots_series(settings['colo_plot_list'], y_train, y_train_predicted, y_test,
                                         y_test_predicted, settings['pollutant'], model_name,
-                                        output_folder_name, settings['colo_run_name'], settings['unit'])
+                                        output_folder_name, settings['colo_run_name'], settings['unit'], current_model,
+                                        list(X_std.columns), X_train, X_test)
+
+
 
 #save out the model for later analysis and use in field data
 model_stats.to_csv(os.path.join('Outputs', output_folder_name, 'colo_model_stats.csv'), index = True)

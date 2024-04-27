@@ -8,6 +8,7 @@ import numpy as np
 import copy
 import pandas as pd
 
+
 #Colocation plots
 def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name,run_name, unit):
     # Set the figure size
@@ -80,12 +81,23 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
     rects3 = ax[1].bar(np.arange(len(model_stats)), model_stats['Training_R2'], bar_width,
                        label='Training R2', color='blue', alpha=opacity)
 
+    # next subplot: Bar plot of training R2
+    rects6 = ax[1].bar(np.arange(len(model_stats)) + bar_width, model_stats['Testing_R2'], bar_width,
+                       label='Testing R2', color='lightblue', alpha=opacity)
+
+
     ax[1].set_ylabel('R2')
     ax[1].set_xticks(np.arange(len(model_stats)))
     ax[1].set_xticklabels(models, rotation=45, ha='right')
 
     # Add value labels on top of each bar
     for rect in rects3:
+        height = rect.get_height()
+        ax[1].text(rect.get_x() + rect.get_width() / 2, height,
+                   f'{height:.2f}', ha='center', va='bottom')
+
+    # Add value labels on top of each bar
+    for rect in rects6:
         height = rect.get_height()
         ax[1].text(rect.get_x() + rect.get_width() / 2, height,
                    f'{height:.2f}', ha='center', va='bottom')
@@ -121,7 +133,7 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
 
     # Move the legend outside the plot
     ax[0].legend(loc='upper center', bbox_to_anchor=(0.5, 1.25), ncol=2)
-    ax[1].legend(loc='upper center',bbox_to_anchor=(0.5, 1.25))
+    ax[1].legend(loc='upper center',bbox_to_anchor=(0.5, 1.25), ncol=2)
     ax[2].legend(loc='upper center', bbox_to_anchor=(0.5, 1.25), ncol=2)
 
     # set overall figure title
@@ -140,10 +152,10 @@ def colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant
     plt.figure(figsize=(8, 8))
 
     # Scatter plot for training data
-    plt.scatter(y_train, y_train_predicted, label='Training', marker='.', color='blue')
+    plt.scatter(y_train, y_train_predicted, label='Training', marker='.', color='blue', s = 50)
 
     # Scatter plot for testing data
-    plt.scatter(y_test, y_test_predicted, label='Testing', marker='.', color='lightblue')
+    plt.scatter(y_test, y_test_predicted, label='Testing', marker='.', color='lightblue', s = 50)
 
     # Set the title of the plot
     plt.title(run_name + ' ' + pollutant + ' ' + model_name + ' - Actual vs Predicted')
@@ -158,11 +170,15 @@ def colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant
     )
 
     # Add a legend to the plot
-    plt.legend()
+    plt.legend(fontsize = 16)
 
     # Set labels for the x and y axes
     plt.xlabel('Reference')
     plt.ylabel('Predicted')
+
+    # Set the font size of x and y tick labels
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
 
     # Adjust the layout to prevent clipping of labels
     plt.tight_layout()
@@ -172,7 +188,7 @@ def colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant
 
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'ref_vs_pred_scatter.png'))
-def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test, pollutant, model_name,output_folder_name, X_features, run_name):
+def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name,output_folder_name, X_features, run_name, X_train, X_test):
     # Calculate residuals
     training_residuals = y_train_predicted - y_train
     testing_residuals = y_test_predicted - y_test
@@ -223,6 +239,32 @@ def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train,
     # Example usage:
     # residual_plot(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test, 'Pollutant', 'ModelName', 'OutputFolderName', X_features)
 
+def corr_heatmap(data_combined, output_folder_name):
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(data=data_combined.corr(), annot=True, cmap="coolwarm",cbar=False,vmin=-1,vmax=1)
+    plt.title('')
+    plt.show(block=False)
+    # Save the plot as an image file
+    plt.savefig(os.path.join('Outputs', output_folder_name, 'corr_heatmap.png'))
+
+def feature_importance(current_model, output_folder_name, run_name, pollutant, model_name, features):
+    if hasattr(current_model, 'feature_importances_'):
+        # Plot feature importance for Random Forest
+        rf_feature_importance = current_model.feature_importances_
+        sorted_idx = np.argsort(rf_feature_importance)
+        pos = np.arange(sorted_idx.shape[0]) + 0.5
+        plt.figure(figsize=(14, 6))
+        plt.bar(pos, rf_feature_importance[sorted_idx], width=0.8, align='center')
+        plt.xticks(pos, [features[i] for i in sorted_idx], rotation=90)
+        plt.ylabel('Relative Importance')
+        plt.xlabel('Feature')
+        plt.title(run_name + ' ' + pollutant + ' ' + model_name + ' - Feature Importance')
+        plt.tight_layout()
+        plt.show(block=False)
+
+        # Save the plot as an image file
+        plt.savefig(os.path.join('Outputs', output_folder_name, model_name + '_feature_important.png'))
+
 #Field plots
 def field_boxplot(data, model_name, output_folder_name, colo_output_folder, pollutant, unit):
     # Set the figure size
@@ -246,7 +288,7 @@ def field_timeseries(data, model_name, output_folder_name, colo_output_folder, p
     plt.figure(figsize=(11, 6))
 
     # Create a scatter plot using Seaborn
-    sns.scatterplot(x='datetime', y=pollutant, hue='location', data=data, marker='.')
+    sns.scatterplot(x='datetime', y=pollutant, hue='location', data=data, marker='.', palette='tab20')
 
     # Set labels for the x and y axes
     plt.xlabel('Datetime')
@@ -260,17 +302,73 @@ def field_timeseries(data, model_name, output_folder_name, colo_output_folder, p
     # Example usage:
     # field_timeseries(data, 'ModelName', 'OutputFolderName', 'ColoOutputFolder', 'Pollutant', 'Unit')
 
+def field_histogram(data, model_name, output_folder_name, colo_output_folder, pollutant, unit):
+    # Set the figure size
+    # Determine the range of values for the pollutant
+    min_value = data[pollutant].min()
+    max_value = data[pollutant].max()
+
+    # Calculate the number of bins based on the desired bin width
+    num_bins = 30
+    #bin_width = int((max_value - min_value)/ num_bins)  # Adjust as needed
+
+    # Create a histogram for each location using Seaborn
+    g = sns.FacetGrid(data=data, col='location', col_wrap=4)
+    g.map(sns.histplot, pollutant, bins=num_bins)  # Adjust the bins as needed , binwidth=bin_width
+
+    # Set labels for the x and y axes
+    g.set_axis_labels(pollutant + ' Concentration (' + unit + ')', 'Frequency')
+
+    # Show the plot
+    plt.show(block=False)
+
+    # Save the histogram as an image file
+    plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, model_name + '_field_prediction_histogram.png'))
+
+def harmonized_field_hist(data, output_folder_name, colo_output_folder, sensors_included):
+    # Set the figure size
+    for sensor in sensors_included:
+        filtered_data = data[data['Sensor'].str.contains(sensor)]
+
+        # Determine the range of values for the pollutant
+        #min_value = filtered_data['Reading'].min()
+        #max_value = filtered_data['Reading'].max()
+
+        # Calculate the number of bins based on the desired bin width
+        #num_bins = 30
+        #bin_width = int((max_value - min_value) / num_bins)
+
+        # Create a histogram for each location using Seaborn
+        g = sns.FacetGrid(data=filtered_data, col='location', col_wrap=4)
+        g.map(sns.histplot, 'Reading', bins=20)  # Adjust the bins as needed, binwidth = bin_width
+
+        # Set labels for the x and y axes
+        g.set_axis_labels(sensor, 'Frequency')
+
+        # Show the plot
+        plt.show(block=False)
+
+        # Save the histogram as an image file
+        plt.savefig(
+            os.path.join('Outputs', colo_output_folder, output_folder_name, 'Harmonized_field_' + sensor + '_histogram.png'))
+
 #Harmonization plots
 def harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name):
     # Create subplots for each sensor in colo_pod_harmon_data
     fig, axs = plt.subplots(nrows=colo_pod_harmon_data.shape[1], ncols=1, figsize=(15, 8.5))
 
+    # Get the tab20 colormap
+    tab20_cmap = plt.cm.get_cmap('tab20')
+
+    # Generate a list of 30 colors from the tab20 colormap
+    tab20_colors = [tab20_cmap(i) for i in range(30)]
+
     # Iterate over each sensor
     for i, sensor in enumerate(colo_pod_harmon_data):
         # Iterate over each key in pod_fitted
-        for key in pod_fitted:
+        for j, key in enumerate(pod_fitted):
             # Scatter plot for fitted values for each key
-            axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.')
+            axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.', color=tab20_colors[j])
 
         # Plot the actual values for the sensor
         axs[i].plot(colo_pod_harmon_data.index, colo_pod_harmon_data[sensor], color='k')
@@ -359,7 +457,7 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     stats_df[['data_type', 'stat']] = stats_df['stat'].str.split('_', n=1, expand=True)
 
     # Create a FacetGrid for visualizing the melted data
-    stat_plot = sns.FacetGrid(stats_df, row='sensor', col='stat', sharey=False, hue='data_type')
+    stat_plot = sns.FacetGrid(stats_df, row='sensor', col='stat', sharey=False, hue='data_type', aspect=2)
 
     # Map a scatter plot for each combination of 'sensor', 'stat', and 'data_type'
     stat_plot.map(sns.scatterplot, "pod", "value")
@@ -377,7 +475,7 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     # Example usage:
     # harmon_stats_plot(model_stats, 'OutputFolderName', 'ColoOutputFolder', 'SensorsIncluded')
 
-def colo_plots_series(colo_plot_list, y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name, colo_run_name,unit):
+def colo_plots_series(colo_plot_list, y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name, colo_run_name,unit, current_model, features, X_train, X_test):
 # plotting of modelled data
     if 'colo_timeseries' in colo_plot_list:
         colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant,
@@ -388,6 +486,10 @@ def colo_plots_series(colo_plot_list, y_train, y_train_predicted, y_test, y_test
                                     model_name, output_folder_name, colo_run_name)
 
     if 'colo_residual' in colo_plot_list:
-        colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test,
-                                    pollutant, model_name, output_folder_name, X_std.columns,
-                                    colo_run_name)
+        colo_residual(y_train, y_train_predicted, y_test, y_test_predicted,
+                                    pollutant, model_name, output_folder_name, features,
+                                    colo_run_name, X_train, X_test)
+
+    if 'feature_importance' in colo_plot_list:
+        feature_importance(current_model, output_folder_name, colo_run_name, pollutant, model_name, features)
+

@@ -19,8 +19,13 @@ def load_deployment_log():
             raise FileNotFoundError("Deployment log file not found.")
 
     expected_columns = ['file_name', 'deployment', 'location', 'pollutant', 'timezone_change_from_ref', 'start', 'end', 'header_type']
-    if not all(deployment_log.columns == expected_columns) or len(deployment_log.columns) != len(expected_columns):
-        raise KeyError('Deployment log column names are incorrect. Please change the columns to the following: file_name, deployment, location, pollutant,timezone_change_from_ref, start, end, header_type')
+    extra_columns = [column for column in deployment_log.columns if column not in expected_columns]
+
+    if extra_columns:
+        deployment_log.drop(columns=extra_columns, inplace=True)
+
+    if not all(column in deployment_log.columns for column in expected_columns):
+        raise KeyError('Deployment log is missing essential columns. Please change the columns to include the following: file_name, deployment, location, pollutant,timezone_change_from_ref, start, end, header_type')
 
     # Specify data types for columns
     dl_dtype = {
@@ -62,7 +67,7 @@ def load_data(data_file_list, deployment_log, column_names, deployment_type, pol
         print(f'Importing {file}')
         # get the correct column names list based on the "header_type" in deployment log
         if deployment_type == 'C':
-            header_type = deployment_log[(deployment_log['deployment'] == 'C') & (deployment_log['pollutant'] == pollutant)]['header_type'].to_string(index=False)
+            header_type = deployment_log[(deployment_log['file_name'] == file) & (deployment_log['pollutant'] == pollutant)]['header_type'].to_string(index=False)
         else:
             header_type = deployment_log[deployment_log['file_name'] == file]['header_type'].to_string(index=False)
         if header_type not in column_names:
@@ -107,8 +112,7 @@ def load_data(data_file_list, deployment_log, column_names, deployment_type, pol
             temp = temp[~time_removed]
 
             # correct datetime to the reference data timezone
-            timezone_change_from_ref = \
-            deployment_log[(deployment_log['file_name'] == file)]['timezone_change_from_ref'].iloc[0]
+            timezone_change_from_ref = deployment_log[(deployment_log['file_name'] == file)]['timezone_change_from_ref'].iloc[0]
             temp.index = temp.index - pd.to_timedelta(timezone_change_from_ref, unit='h')
 
             if deployment_type == 'C':
@@ -116,14 +120,14 @@ def load_data(data_file_list, deployment_log, column_names, deployment_type, pol
                 if i == 0:
                     pod_data = temp
                 else:
-                    pod_data = pd.merge([pod_data, temp], how='outer', on='A')
+                    pod_data = pd.concat([pod_data, temp], axis=0, join='outer')
 
             elif deployment_type == 'H' or deployment_type == 'F':
                 pod_name = pod_list[i]
                 # either save the pod data in a new dataframe in the field dictionary, or add the data to the preexisting dataframe for that pod
                 # (if there is multiple field files for a pod)
                 if isinstance(pod_data[pod_name], pd.DataFrame):
-                    pod_data[pod_name] = pd.merge(pod_data[pod_name], temp, how='outer', on='A')
+                    pod_data[pod_name] = pd.concat([pod_data[pod_name], temp], axis=0, join='outer')
                 else:
                     pod_data[pod_name] = temp
 

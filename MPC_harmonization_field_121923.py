@@ -25,14 +25,26 @@ hf_set = {}
 
 ####
 #edit the variables in this section for the harmonization - field run
-colo_output_folder = 'Output_Oct2Dec_Reference_CH4_RFQWTuned' #the code will pull the best_model from this, and also save new stuff into it
-hf_set['run_field'] = True    #True if you want to apply calibration to field data,
+hf_set['hf_run_name'] = 'testing_harmonization'
+colo_output_folder = 'Output_allSensor_testingHarmonization' #the code will pull the best_model from this, and also save new stuff into it
+#
+
+#then test non-zscored tvoc and go back and fix MPC_colocation as needed!
+
+hf_set['run_field'] = False    #True if you want to apply calibration to field data,
                                     #False if you only want to look at harmonization data
-hf_set['best_model'] = 'rf_p_95_w_10'    #model that you would like to apply to field data from the output_folder
+hf_set['best_model'] = 'lin_reg'    #model that you would like to apply to field data from the output_folder
 hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
-hf_set['field_plot_list'] = ['field_boxplot','field_timeseries'] #field plots
-hf_set['harmon_plot_list'] = [] #harmonization plots
+hf_set['field_plot_list'] = ['field_timeseries','field_boxplot'] #field plots
+hf_set['harmon_plot_list'] = ['harmon_timeseries','harmon_stats_plot'] #harmonization plots 'harmon_timeseries','harmon_stats_plot'
+hf_set['TElapsed_in_harmon']= True
+hf_set['crop_field_time']= True
+
+hf_set['field_start']= '2023-10-11 01:00:00'
+hf_set['field_end']= '2023-12-21 00:00:00'
+
 ####
+
 
 ###############
 # Check if the output folder exists
@@ -48,27 +60,29 @@ plt.close('all')
 
 
 #Create harmonization_field output folder
-# Get the current time as YYMMDDHHss
-current_time = datetime.now().strftime('%y%m%d%H%M%S')
-# Create the output folder name
-output_folder_name = f'Output_{settings["best_model"]}_{current_time}'
+if hf_set['hf_run_name']== '':
+    # Get the current time as YYMMDDHHss
+    current_time = datetime.now().strftime('%y%m%d%H%M%S')
+    # Create the output folder name
+    output_folder_name = f'Output_{settings["best_model"]}_{current_time}'
+    del current_time
+else: output_folder_name = f'Output_{settings["best_model"]}_{settings["hf_run_name"]}'
 
-# Create the output folder
-os.makedirs(os.path.join('Outputs', colo_output_folder, output_folder_name))
+# Check if the directory already exists
+if os.path.exists(os.path.join('Outputs', colo_output_folder, output_folder_name)):
+    raise FileExistsError(f"The Output folder '{output_folder_name}' already exists. Please choose a different output folder name or use the current time option (settings['colo_run_name'] == '').")
+else:
+    # Create the output folder
+    os.makedirs(os.path.join('Outputs', colo_output_folder, output_folder_name))
 
 # Load deployment log
 print('Loading deployment log...')
 deployment_log = data_loading_func.load_deployment_log()
 
-
-#Load harmonization data
-#get list of all harmonization files to combine
-harmon_file_list = deployment_log[(deployment_log['deployment']=='H')]['file_name']
-#shorten the list to just the pod names (not the whole file name)
+# get list of all harmonization files to combine
+harmon_file_list = deployment_log[(deployment_log['deployment'] == 'H')]['file_name']
+# shorten the list to just the pod names (not the whole file name)
 harmon_pod_list = [string.split('_')[0] for string in harmon_file_list]
-
-#make a dictionary with a dataframe for each unique harmonization pod
-pod_harmonization_data = dict.fromkeys(harmon_pod_list)
 
 #Identify the colocation pod in the harmonization data
 colo_pod_name= settings['colo_pod_name']
@@ -76,20 +90,32 @@ if not isinstance(colo_pod_name, str): #first check that colo_pod_name is a stri
     colo_pod_name = colo_pod_name[0]
 
 #load pod data
-print('Loading harmonization pod data...')
-pod_harmonization_data = data_loading_func.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'])
+if not os.path.exists(os.path.join('Outputs', colo_output_folder, 'pod_harmonization_data.joblib')):
+    # Load harmonization data
+    # make a dictionary with a dataframe for each unique harmonization pod
+    pod_harmonization_data = dict.fromkeys(harmon_pod_list)
 
-# Check if there is any harmonization data
-assert bool(pod_harmonization_data), "No harmonization data was found in the Harmonization folder that matched the deployment log. Stopping execution."
+    print('Loading harmonization pod data from txt files...')
+    pod_harmonization_data = data_loading_func.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'])
 
-print('Preprocessing harmonization pod and reference data...')
-for podname in pod_harmonization_data:
-    #harmonization data preprocessing
-   pod_harmonization_data[podname] = preprocessing_func.preprocessing_func(pod_harmonization_data[podname], settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
+    # Check if there is any harmonization data
+    assert bool(pod_harmonization_data), "No harmonization data was found in the Harmonization folder that matched the deployment log. Stopping execution."
 
-if colo_pod_name not in pod_harmonization_data:
-    raise KeyError(f'Harmonization data for the colocation pod {colo_pod_name} was not found in Harmonization folder. Run cannot continue.')
-    
+    print('Preprocessing harmonization pod and reference data...')
+    for podname in pod_harmonization_data:
+        #harmonization data preprocessing
+        pod_harmonization_data[podname] = preprocessing_func.preprocessing_func(pod_harmonization_data[podname], settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
+
+    if colo_pod_name not in pod_harmonization_data:
+        raise KeyError(f'Harmonization data for the colocation pod {colo_pod_name} was not found in Harmonization folder. Run cannot continue.')
+
+    joblib.dump(pod_harmonization_data, os.path.join('Outputs', colo_output_folder, 'pod_harmonization_data.joblib'))
+
+else:
+    print('Loading preprocessed harmonization pod data from joblib...')
+
+pod_harmonization_data = joblib.load(os.path.join('Outputs', colo_output_folder, 'pod_harmonization_data.joblib'))
+
 #create a dictionary to add harmonized pod timeseries into
 pod_fitted = {key: None for key in pod_harmonization_data}
 del pod_fitted[colo_pod_name]
@@ -132,7 +158,10 @@ for pod_num, podname in enumerate(pod_fitted):
         if settings['retime_calc']=='mean':
             temp= pd.concat([pod_harmonization_data[colo_pod_name][sensor + '_colo'], pod_harmonization_data[podname][sensor]], axis=1).resample(settings['time_interval']+'T').mean()
         temp.dropna(inplace=True)
-        
+
+        if settings['TElapsed_in_harmon']:
+            settings['earliest_harmon_time'] = deployment_log[deployment_log['deployment']=='H']['start'].min()
+            temp = preprocessing_func.add_time_elapsed(temp, settings['earliest_harmon_time'])
         
         #create X and y dataframes for harmonization step
         X=temp.drop([sensor + '_colo'],axis=1)
@@ -173,7 +202,7 @@ for pod_num, podname in enumerate(pod_fitted):
         harmonization_mdls[podname][sensor]=current_model
         
         #save the raw, unfitted data 
-        preprocessed_harmon_data[podname][sensor] = X
+        preprocessed_harmon_data[podname][sensor] = X[sensor]
         
         #save the colocation pod harmonization data
         colo_pod_harmon_data[sensor] = y
@@ -200,21 +229,36 @@ elif settings['run_field'] == True:
     fit_model= joblib.load(os.path.join('Outputs', colo_output_folder, f'{settings["best_model"]}_model.joblib'))
     
     #Load field data
-    print('Loading field data...')
     #get list of all field files to combine
     field_file_list = deployment_log[(deployment_log['deployment']=='F')]['file_name']
     #shorten the list to just the pod names (not the whole file name)
-    field_pod_list = [string.split('_')[0] for string in field_file_list]     
-    
-    #make a dictionary with a dataframe for each unique pod
-    pod_field_data = dict.fromkeys(field_pod_list)
-    
-    #load pod data
-    pod_field_data = data_loading_func.load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'])
-    
+    field_pod_list = [string.split('_')[0] for string in field_file_list]
+
+    if not os.path.exists(os.path.join('Outputs', colo_output_folder, 'pod_field_data.joblib')):
+
+        #make a dictionary with a dataframe for each unique pod
+        pod_field_data = dict.fromkeys(field_pod_list)
+
+        #load pod data
+        pod_field_data = data_loading_func.load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'])
+
+        for podname in pod_field_data:
+            # field data preprocessing
+            print(f'Preprocessing pod {podname}...')
+            pod_field_data[podname] = preprocessing_func.preprocessing_func(pod_field_data[podname],
+                                                                        settings['sensors_included'],
+                                                                        settings['t_warmup'], settings['preprocess'])
+
+        joblib.dump(pod_field_data, os.path.join('Outputs', colo_output_folder, 'pod_field_data.joblib'))
+
+    else:
+        print('Loading preprocessed field pod data from joblib...')
+
+    pod_field_data = joblib.load(os.path.join('Outputs', colo_output_folder, 'pod_field_data.joblib'))
+
     # Check for pods in field_list not present in harmonization_list
     not_in_harmonization = [item for item in field_pod_list if item not in list(pod_harmonization_data)]
-    
+
     # If there are items not in harmonization_list, raise a KeyError
     if not_in_harmonization:
         print()
@@ -222,63 +266,92 @@ elif settings['run_field'] == True:
         print()
         for i in not_in_harmonization:
             del pod_field_data[i]
-    
+
     # Check if there is any field data
     assert bool(pod_field_data), "No field data was found in the Field folder that matched the deployment log. Stopping execution."
     
     #create a dictionary to add fitted field pod timeseries into
     X_fitted_field = {key: None for key in pod_field_data}
     X_fitted_field_std = {key: None for key in pod_field_data}
-    
+    X_fitted_field_noindex = {key: None for key in pod_field_data}
+
     Y_field_dict={key: None for key in pod_field_data} #they will have diff timeseries, so start by making dictionary in each then combine into a dataframe at the end
     Y_field_noindex={key: None for key in pod_field_data}
-    
-    
-    for podname in pod_field_data:
-        print(f'Preprocessing, harmonizing, and calibrating pod {podname}...')
-        #field data preprocessing
-        pod_field_data[podname] = preprocessing_func.preprocessing_func(pod_field_data[podname], settings['sensors_included'], settings['t_warmup'], settings['preprocess'])
-    
-        #time average the pod field data
-        if settings['retime_calc']=='median':
-            temp= pod_field_data[podname].resample(settings['time_interval']+'T').median()
-        if settings['retime_calc']=='mean':
-            temp= pod_field_data[podname].resample(settings['time_interval']+'T').mean()
-        temp.dropna(inplace=True)
-        
-        # Fit and transform the data, and convert it back to a DataFrame
-        X_fitted_field[podname]=pd.DataFrame(columns=settings['sensors_included'], index=temp.index)
-        
-        #apply harmonization models to the field sensors
-        for i, sensor in enumerate(settings['sensors_included']):
-            X=pd.DataFrame(temp[sensor], index=temp.index)
-            X_fitted_field[podname][sensor]=harmonization_mdls[podname][sensor].predict(X)
-        
-        #create interaction terms if using in the colocation model
-        if "interaction_terms" in settings['preprocess']:
-            X_fitted_field[podname] = preprocessing_func.interaction_terms(X_fitted_field[podname])
-    
-        #time elapsed needs to come after time averaging to be accurate (at least for median)
-        if "add_time_elapsed" in settings['preprocess']:
-            X_fitted_field[podname] = preprocessing_func.add_time_elapsed(X_fitted_field[podname], settings['earliest_time'])
-        
-            #if you are using a fig2600/fig2602 ratio, make that column here
-        if "fig_ratio" in settings['preprocess']:
-            X_fitted_field[podname] = preprocessing_func.fig_ratio(X_fitted_field[podname])
-    
-        #Scaling of fitted X field data
-        X_fitted_field_std[podname] = settings['scaler'].fit_transform(X_fitted_field[podname])
-    
-        #apply colocation model to the harmonized field data
-        Y_field_dict[podname]=pd.DataFrame(fit_model.predict(X_fitted_field_std[podname]),index=X_fitted_field[podname].index,columns=[settings['pollutant']])
-        
-        Y_field_noindex[podname]=Y_field_dict[podname].reset_index()
-    
+    melted_X = {key: None for key in pod_field_data}
+
+    podnames_copy = list(pod_field_data.keys())
+    for podname in podnames_copy:
+        print(f'Harmonizing, and calibrating pod {podname}...')
+
+        if hf_set['crop_field_time']:
+            time_removed = (pod_field_data[podname].index < hf_set['field_start']) | (pod_field_data[podname].index > hf_set['field_end'])
+            pod_field_data[podname] = pod_field_data[podname][~time_removed]
+
+        if pod_field_data[podname].empty:
+            del pod_field_data[podname]
+            del Y_field_dict[podname]
+            del Y_field_noindex[podname]
+            del X_fitted_field[podname]
+            del X_fitted_field_std[podname]
+            del X_fitted_field_noindex[podname]
+            del melted_X[podname]
+        else:
+            #time average the pod field data
+            if settings['retime_calc']=='median':
+                temp= pod_field_data[podname].resample(settings['time_interval']+'T').median()
+            if settings['retime_calc']=='mean':
+                temp= pod_field_data[podname].resample(settings['time_interval']+'T').mean()
+            temp.dropna(inplace=True)
+
+
+            # Fit and transform the data, and convert it back to a DataFrame
+            X_fitted_field[podname]=pd.DataFrame(columns=settings['sensors_included'], index=temp.index)
+
+            #apply harmonization models to the field sensors
+            for i, sensor in enumerate(settings['sensors_included']):
+                X=pd.DataFrame(temp[sensor], index=temp.index)
+
+                if settings['TElapsed_in_harmon']:
+                    X = preprocessing_func.add_time_elapsed(X, settings['earliest_harmon_time'])
+
+                X_fitted_field[podname][sensor]=harmonization_mdls[podname][sensor].predict(X)
+
+            #create interaction terms if using in the colocation model
+            if "interaction_terms" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.interaction_terms(X_fitted_field[podname])
+
+            #time elapsed needs to come after time averaging to be accurate (at least for median)
+            if "add_time_elapsed" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.add_time_elapsed(X_fitted_field[podname], settings['earliest_time'])
+
+                #if you are using a fig2600/fig2602 ratio, make that column here
+            if "fig_ratio" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.fig_ratio(X_fitted_field[podname])
+
+            #Scaling of fitted X field data
+            X_fitted_field_std[podname] = settings['scaler'].transform(X_fitted_field[podname])
+            #X_fitted_field_std[podname] = X_fitted_field[podname]
+            #^^^^ need to undo this z scoring at the end!!
+
+            #apply colocation model to the harmonized field data
+            Y_field_dict[podname]=pd.DataFrame(fit_model.predict(X_fitted_field_std[podname]),index=X_fitted_field[podname].index,columns=[settings['pollutant']])
+
+            Y_field_noindex[podname]=Y_field_dict[podname].reset_index()
+
+            X_fitted_field_noindex[podname] = X_fitted_field[podname].reset_index()
+            melted_X[podname] = pd.melt(X_fitted_field_noindex[podname], id_vars='datetime', var_name='Sensor', value_name='Reading')
+
+    del podnames_copy
+    del X_fitted_field_noindex
+
     #convert the Y_field data into a single data frame instead of separated into a dictionary by pod names. Add a column that lists the pod name for the data sample    
-    Y_field_df=pd.concat([df.assign(pod=name) for name, df in Y_field_noindex.items()])
-    
+    Y_field_df = pd.concat([df.assign(pod=name) for name, df in Y_field_noindex.items()])
+    X_fitted_field_df = pd.concat([df.assign(pod=name) for name, df in melted_X.items()])
+    del melted_X
+
     # Add location column to plot by this instead of pod
     Y_field_df = data_loading_func.field_location(Y_field_df, deployment_log)
+    X_fitted_field_df = data_loading_func.field_location(X_fitted_field_df, deployment_log)
 
     #field plotting
     if 'field_timeseries' in settings['field_plot_list']:
@@ -287,7 +360,15 @@ elif settings['run_field'] == True:
     
     if 'field_boxplot' in settings['field_plot_list']:
         plotting_func.field_boxplot(Y_field_df, settings['best_model'], output_folder_name, colo_output_folder, settings['pollutant'],settings['unit'])
-    
+
+    if 'field_histogram' in settings['field_plot_list']:
+        plotting_func.field_histogram(Y_field_df, settings['best_model'], output_folder_name, colo_output_folder, settings['pollutant'],settings['unit'])
+
+    if 'harmonized_field_hist' in settings['field_plot_list']:
+        plotting_func.harmonized_field_hist(X_fitted_field_df, output_folder_name, colo_output_folder,
+                                      settings['sensors_included'])
+
+
     #save out important info
     print('Saving important run data...')
     #save y_field data by pod
@@ -353,3 +434,4 @@ for stat in model_stats:
         # Iterate through the dictionary and write each DataFrame to a sheet
         for sheet_name, df in model_stats[stat].items():
             df.to_excel(writer, sheet_name=sheet_name,index=False)
+

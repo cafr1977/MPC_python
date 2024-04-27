@@ -46,8 +46,18 @@ def interaction_terms(data):
     #create columns of interaction terms that are a each 2-sensor combination multiplied together
     #for CO, temp, humidity sensor, it would be CO*temp, CO*humidity, temp*humidity
     poly = PolynomialFeatures(degree=2,interaction_only=True, include_bias=False)
-    data = poly.fit_transform(data)
-    return data
+    data_transformed = poly.fit_transform(data)
+    data_transformed_df = pd.DataFrame(data_transformed)
+    original_columns = data.columns.tolist()
+    interaction_columns = []
+    for i, col1 in enumerate(original_columns):
+        for j, col2 in enumerate(original_columns[i + 1:]):
+            interaction_columns.append(f"{col1}*{col2}")
+
+        # Rename the columns of the DataFrame
+    data_transformed_df.columns = original_columns + interaction_columns
+
+    return data_transformed_df
 
 def hum_rel_2_abs(data):
     if 'Humidity' not in data.columns:
@@ -71,12 +81,44 @@ def add_time_elapsed(data, earliest_time):
     data = data.drop('time_elapsed',axis=1)
     return data
 
-def fig_ratio(data):
+def fig2600_2602_ratio(data):
     if 'Fig2600' not in data.columns or 'Fig2602' not in data.columns:
         raise KeyError(
             "'Fig2600' AND/OR 'Fig2602' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
 
-    data['fig ratio'] = data['Fig2600'] / data['Fig2602']
+    data['fig 2600_2602 ratio'] = data['Fig2600'] / data['Fig2602']
+    return data
+
+def fig3_2602_ratio(data):
+    if 'Fig3' not in data.columns or 'Fig2602' not in data.columns:
+        raise KeyError(
+            "'Fig3' AND/OR 'Fig2602' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 3_2602 ratio'] = data['Fig3'] / data['Fig2602']
+    return data
+
+def fig4_2602_ratio(data):
+    if 'Fig4' not in data.columns or 'Fig2602' not in data.columns:
+        raise KeyError(
+            "'Fig4' AND/OR 'Fig2602' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 4_2602 ratio'] = data['Fig4'] / data['Fig2602']
+    return data
+
+def fig4_3_ratio(data):
+    if 'Fig3' not in data.columns or 'Fig4' not in data.columns:
+        raise KeyError(
+            "'Fig3' AND/OR 'Fig4' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 4_3 ratio'] = data['Fig4'] / data['Fig3']
+    return data
+
+def fig2600_3_ratio(data):
+    if 'Fig2600' not in data.columns or 'Fig3' not in data.columns:
+        raise KeyError(
+            "'Fig2600' AND/OR 'Fig3' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 2600_3 ratio'] = data['Fig2600'] / data['Fig3']
     return data
 
 def binned_resample(X_train, y_train, n_bins):
@@ -164,13 +206,18 @@ def preprocessing_func(data, sensors_included, t_warmup, preprocess):
      
      #remove unused columns in colo pod and ref
      data = data[sensors_included]
-     
+
      #put data in time order (otherwise a lot of data might be deleted when removing warm up)
      data = data.sort_index()
      
      # Remove warm-up
      if "rmv_warmup" in preprocess:
          data = rmv_warmup(data, t_warmup)
+
+     if "rmv_negative_CO_aux" in preprocess:
+         if "CO_aux" in sensors_included:
+            data = data[data['CO_aux'] >= -100]
+         else: raise KeyError('Preprocessing step "rmv_negative_CO_aux" could not run because CO_aux is not an included sensor')
      
      # Drop rows with NaN values
      data.dropna(inplace=True)
