@@ -25,23 +25,24 @@ hf_set = {}
 
 ####
 #edit the variables in this section for the harmonization - field run
-hf_set['hf_run_name'] = 'testing_harmonization'
-colo_output_folder = 'Output_allSensor_testingHarmonization' #the code will pull the best_model from this, and also save new stuff into it
-#
+hf_set['hf_run_name'] = '' # #Name of the harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
+                                                # ^^ If you want the harmonization/field outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
+colo_output_folder = 'Output_240528182037' #the code will pull the best_model from this, and also save new stuff into it
 
-#then test non-zscored tvoc and go back and fix MPC_colocation as needed!
-
-hf_set['run_field'] = False    #True if you want to apply calibration to field data,
+hf_set['run_field'] = True    #True if you want to apply calibration to field data,
                                     #False if you only want to look at harmonization data
-hf_set['best_model'] = 'lin_reg'    #model that you would like to apply to field data from the output_folder
+hf_set['best_model'] = 'random_forest'    #model that you would like to apply to field data from the output_folder
 hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
-hf_set['field_plot_list'] = ['field_timeseries','field_boxplot'] #field plots
-hf_set['harmon_plot_list'] = ['harmon_timeseries','harmon_stats_plot'] #harmonization plots 'harmon_timeseries','harmon_stats_plot'
-hf_set['TElapsed_in_harmon']= True
-hf_set['crop_field_time']= True
+hf_set['field_plot_list'] = ['field_boxplot','field_timeseries'] #field plots: 'field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist'
+                                # ^^ harmonized_field_hist plots the field data after the harmonization correction is applied but before the field data is calibrated to the colocaiton model
+hf_set['harmon_plot_list'] = [] #harmonization plots: 'harmon_timeseries','harmon_stats_plot', 'harmon_scatter',
+hf_set['TElapsed_in_harmon']= True   # if you have bookended harmonizations, it's a good idea to add in a time elapsed term to the harmonization models
+                                    # if you do not have bookended harmonizaitons, adding in time elapsed is probs a bad idea because it will overcorrect.
 
-hf_set['field_start']= '2023-10-11 01:00:00'
-hf_set['field_end']= '2023-12-21 00:00:00'
+hf_set['crop_field_time']= False    # set to true if you want to crop the field times that are fit/plotted
+
+hf_set['field_start']= '2023-10-11 01:00:00' #if field_crop_time is True, set the start time. everything before will be cropped.
+hf_set['field_end']= '2023-12-21 00:00:00'   #if field_crop_time is True, set the end time. everything after will be cropped.
 
 ####
 
@@ -96,7 +97,7 @@ if not os.path.exists(os.path.join('Outputs', colo_output_folder, 'pod_harmoniza
     pod_harmonization_data = dict.fromkeys(harmon_pod_list)
 
     print('Loading harmonization pod data from txt files...')
-    pod_harmonization_data = data_loading_func.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'])
+    pod_harmonization_data, deployment_log = data_loading_func.load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'], settings['ref_timezone'])
 
     # Check if there is any harmonization data
     assert bool(pod_harmonization_data), "No harmonization data was found in the Harmonization folder that matched the deployment log. Stopping execution."
@@ -129,7 +130,7 @@ colo_pod_harmon_data =pd.DataFrame(columns=settings['sensors_included'])
 
 
 #create a dictionary of model stats (R2, RMSE, MBE)
-model_stats = dict.fromkeys(['Training_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
+model_stats = dict.fromkeys(['Training_R2','Testing_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
 for stat in model_stats:
     model_stats[stat]=dict.fromkeys(settings['sensors_included'])
     for sensor in settings['sensors_included']:
@@ -146,8 +147,8 @@ pod_harmonization_data[colo_pod_name]=pod_harmonization_data[colo_pod_name].rena
 
 for pod_num, podname in enumerate(pod_fitted):
     #make dataframes to put the preprocessed and fitted data into.
-    pod_fitted[podname]=pd.DataFrame(columns=settings['sensors_included'])
-    preprocessed_harmon_data[podname]=pd.DataFrame(columns=settings['sensors_included'])
+    pod_fitted[podname]= pd.DataFrame(columns=settings['sensors_included'])
+    preprocessed_harmon_data[podname]= pd.DataFrame(columns=settings['sensors_included'])
     #make a dictionary to save the harmonization models into
     harmonization_mdls[podname] = dict.fromkeys(pod_fitted[podname].columns)
     
@@ -192,6 +193,7 @@ for pod_num, podname in enumerate(pod_fitted):
             model_stats['Training_RMSE'][sensor].iloc[fold,pod_num] = (np.sqrt(mean_squared_error(y_train, y_train_predicted)))
             model_stats['Testing_RMSE'][sensor].iloc[fold,pod_num] = (np.sqrt(mean_squared_error(y_test, y_test_predicted)))
             model_stats['Training_R2'][sensor].iloc[fold,pod_num] = round(CV_model.score(X_train, y_train),2)
+            model_stats['Testing_R2'][sensor].iloc[fold,pod_num] = round(CV_model.score(X_test, y_test),2)
             model_stats['Training_MBE'][sensor].iloc[fold,pod_num] = np.mean(y_train_predicted - y_train)
             model_stats['Testing_MBE'][sensor].iloc[fold,pod_num] = np.mean(y_test_predicted - y_test)
 
@@ -206,7 +208,7 @@ for pod_num, podname in enumerate(pod_fitted):
         
         #save the colocation pod harmonization data
         colo_pod_harmon_data[sensor] = y
-    
+
     pod_fitted[podname] = pod_fitted[podname].set_index(X.index)
 
 # Harmonization plotting
@@ -240,7 +242,7 @@ elif settings['run_field'] == True:
         pod_field_data = dict.fromkeys(field_pod_list)
 
         #load pod data
-        pod_field_data = data_loading_func.load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'])
+        pod_field_data, deployment_log = data_loading_func.load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'], settings['ref_timezone'])
 
         for podname in pod_field_data:
             # field data preprocessing
@@ -325,8 +327,21 @@ elif settings['run_field'] == True:
                 X_fitted_field[podname] = preprocessing_func.add_time_elapsed(X_fitted_field[podname], settings['earliest_time'])
 
                 #if you are using a fig2600/fig2602 ratio, make that column here
-            if "fig_ratio" in settings['preprocess']:
-                X_fitted_field[podname] = preprocessing_func.fig_ratio(X_fitted_field[podname])
+            if "fig2600_2602_ratio" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.fig2600_2602_ratio(X_fitted_field[podname])
+
+            if "fig2600_3_ratio" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.fig2600_3_ratio(X_fitted_field[podname])
+
+            if "fig3_2602_ratio" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.fig3_2602_ratio(X_fitted_field[podname])
+
+            if "fig4_2602_ratio" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.fig4_2602_ratio(X_fitted_field[podname])
+
+            if "fig4_3_ratio" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.fig4_3_ratio(X_fitted_field[podname])
+
 
             #Scaling of fitted X field data
             X_fitted_field_std[podname] = settings['scaler'].transform(X_fitted_field[podname])

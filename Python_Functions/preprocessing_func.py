@@ -121,11 +121,9 @@ def fig2600_3_ratio(data):
     data['fig 2600_3 ratio'] = data['Fig2600'] / data['Fig3']
     return data
 
-def binned_resample(X_train, y_train, n_bins):
+def binned_resample(X_train, y_train, n_bins, target_bin_multiplier ):
     downsampled_series_list = []
-    # Run on reference data
-    target_bin_multiplier = 2  #Target samples per bin is set as 1/n_bins. However, this can be adjusted if you don't want to remove so much data
-    # When target_bin_multiplier is 2, the target samples per bin is twice as much as the mean number of samples per bin. Less data will be removed this way.
+    # Run on reference data.
     bins, edges = np.histogram(y_train, bins=n_bins, density=False)
 
     # Determine the desired number of samples per bin
@@ -214,6 +212,7 @@ def preprocessing_func(data, sensors_included, t_warmup, preprocess):
      if "rmv_warmup" in preprocess:
          data = rmv_warmup(data, t_warmup)
 
+    #remove the random negative CO_aux values
      if "rmv_negative_CO_aux" in preprocess:
          if "CO_aux" in sensors_included:
             data = data[data['CO_aux'] >= -100]
