@@ -7,6 +7,7 @@ Created on Tue Dec 19 14:33:19 2023
 import pandas as pd
 from atmos import calculate
 from sklearn.preprocessing import PolynomialFeatures
+import numpy as np
 
 def temp_C_2_K(data):
     #convert temp from celsius to kelvin
@@ -45,8 +46,18 @@ def interaction_terms(data):
     #create columns of interaction terms that are a each 2-sensor combination multiplied together
     #for CO, temp, humidity sensor, it would be CO*temp, CO*humidity, temp*humidity
     poly = PolynomialFeatures(degree=2,interaction_only=True, include_bias=False)
-    data = poly.fit_transform(data)
-    return data
+    data_transformed = poly.fit_transform(data)
+    data_transformed_df = pd.DataFrame(data_transformed)
+    original_columns = data.columns.tolist()
+    interaction_columns = []
+    for i, col1 in enumerate(original_columns):
+        for j, col2 in enumerate(original_columns[i + 1:]):
+            interaction_columns.append(f"{col1}*{col2}")
+
+        # Rename the columns of the DataFrame
+    data_transformed_df.columns = original_columns + interaction_columns
+
+    return data_transformed_df
 
 def hum_rel_2_abs(data):
     if 'Humidity' not in data.columns:
@@ -70,18 +81,108 @@ def add_time_elapsed(data, earliest_time):
     data = data.drop('time_elapsed',axis=1)
     return data
 
-def fig_ratio(data):
+def fig2600_2602_ratio(data):
     if 'Fig2600' not in data.columns or 'Fig2602' not in data.columns:
         raise KeyError(
             "'Fig2600' AND/OR 'Fig2602' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
 
-    data['fig ratio'] = data['Fig2600'] / data['Fig2602']
+    data['fig 2600_2602 ratio'] = data['Fig2600'] / data['Fig2602']
     return data
+
+def fig3_2602_ratio(data):
+    if 'Fig3' not in data.columns or 'Fig2602' not in data.columns:
+        raise KeyError(
+            "'Fig3' AND/OR 'Fig2602' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 3_2602 ratio'] = data['Fig3'] / data['Fig2602']
+    return data
+
+def fig4_2602_ratio(data):
+    if 'Fig4' not in data.columns or 'Fig2602' not in data.columns:
+        raise KeyError(
+            "'Fig4' AND/OR 'Fig2602' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 4_2602 ratio'] = data['Fig4'] / data['Fig2602']
+    return data
+
+def fig4_3_ratio(data):
+    if 'Fig3' not in data.columns or 'Fig4' not in data.columns:
+        raise KeyError(
+            "'Fig3' AND/OR 'Fig4' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 4_3 ratio'] = data['Fig4'] / data['Fig3']
+    return data
+
+def fig2600_3_ratio(data):
+    if 'Fig2600' not in data.columns or 'Fig3' not in data.columns:
+        raise KeyError(
+            "'Fig2600' AND/OR 'Fig3' column(s) not found in pod data, so fig_ratio cannot run. Check column_names variable.")
+
+    data['fig 2600_3 ratio'] = data['Fig2600'] / data['Fig3']
+    return data
+
+def binned_resample(X_train, y_train, n_bins, target_bin_multiplier ):
+    downsampled_series_list = []
+    # Run on reference data.
+    bins, edges = np.histogram(y_train, bins=n_bins, density=False)
+
+    # Determine the desired number of samples per bin
+    target_samples_per_bin = round(target_bin_multiplier * len(y_train) // n_bins)
+
+    # Downsampling to ensure the same number of samples in each bin
+    rows_to_remove = []
+    for i in range(n_bins):
+        bin_indices = np.where((y_train >= edges[i]) & (y_train <= edges[i + 1]))[0]
+        if len(bin_indices) > target_samples_per_bin:
+            # If more samples in the bin than the target, randomly select samples
+            selected_indices = np.random.choice(bin_indices, size=target_samples_per_bin, replace=False)
+            selected_values = y_train.iloc[selected_indices]
+            downsampled_series_list.append(selected_values)
+            # Save indices to remove from the DataFrame
+            rows_to_remove.extend(bin_indices[~np.isin(bin_indices, selected_indices)])
+        else:
+            # If fewer samples, include all samples in the bin
+            downsampled_series_list.append(y_train.iloc[bin_indices])
+
+    # Concatenate the downsampled Series into a single Series
+    y_selected = pd.concat(downsampled_series_list) #y selected is shuffled!
+    y_selected = y_selected.sort_index()
+    # Remove rows from df_to_remove based on the indices removed during downsampling
+    #X_selected = X_train.drop(index=X_train.index[rows_to_remove])
+    X_selected = np.delete(X_train, rows_to_remove, axis=0) #X selected is not!!! this is causing model fit problems.
+
+    return X_selected, y_selected
+
+def resample_quartile(X_train, y_train, quartile, downsampling_rate):
+
+    quartiles = pd.DataFrame({'Lower':[0, 0.25, 0.5, 0.75],
+                              'Upper': [0.25, 0.5, 0.75, 1]},
+                             index = ['first','second','third','fourth'])
+
+    upper_edge = y_train.quantile(quartiles['Upper'].loc[quartile])
+    lower_edge = y_train.quantile(quartiles['Lower'].loc[quartile])
+    quartile_filter = (y_train < upper_edge) & (y_train >= lower_edge)
+
+    quartile_indices = y_train[quartile_filter].index
+
+    # Calculate the number of instances to keep
+    num_instances_to_remove = int(len(quartile_indices) * (1-downsampling_rate))
+
+    # Randomly sample instances to keep
+    removed_quartile_indices = np.random.choice(quartile_indices, size=num_instances_to_remove,
+                                                          replace=False)
+
+    # Create the downsampled dataset
+    y_selected = y_train.drop(index=removed_quartile_indices)
+    X_selected = X_train.drop(index=removed_quartile_indices)
+
+    return X_selected, y_selected
+    # Now, 'downsampled_df' represents the dataset with downsampled lower quartile values
 
 def preprocessing_func(data, sensors_included, t_warmup, preprocess):
      #change 999 to NA
      data.replace(999, pd.NA, inplace=True)
-     
+
      #make sure all columns are numeric to avoid errors later:
      for col in data:
          data[col] = pd.to_numeric(data[col], errors='coerce').astype(float)
@@ -103,13 +204,19 @@ def preprocessing_func(data, sensors_included, t_warmup, preprocess):
      
      #remove unused columns in colo pod and ref
      data = data[sensors_included]
-     
+
      #put data in time order (otherwise a lot of data might be deleted when removing warm up)
      data = data.sort_index()
      
      # Remove warm-up
      if "rmv_warmup" in preprocess:
          data = rmv_warmup(data, t_warmup)
+
+    #remove the random negative CO_aux values
+     if "rmv_negative_CO_aux" in preprocess:
+         if "CO_aux" in sensors_included:
+            data = data[data['CO_aux'] >= -100]
+         else: raise KeyError('Preprocessing step "rmv_negative_CO_aux" could not run because CO_aux is not an included sensor')
      
      # Drop rows with NaN values
      data.dropna(inplace=True)
