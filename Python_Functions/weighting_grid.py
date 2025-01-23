@@ -3,6 +3,7 @@ from sklearn.model_selection import RandomizedSearchCV, KFold
 from sklearn.ensemble import RandomForestRegressor
 from Python_Functions import colo_model_func
 from sklearn.svm import SVR
+from sklearn.linear_model import LinearRegression
 
 def weights_set(y_train, percentile, weight):
     # Calculate the target variable values for training set
@@ -12,12 +13,12 @@ def weights_set(y_train, percentile, weight):
     peaks = np.percentile(y_train_values, percentile)
 
     # Create weights based on quartiles
-    #anything in the 95th percentile or above is weighted 8
-    #everything below that is weighted 1
-    weights = np.where(y_train_values >= peaks, weight, 1.0)
+    #anything in the 95th percentile or below is weighted with weight
+    #everything above that is weighted 1
+    weights = np.where(y_train_values >= peaks, 1.0, weight)
     return weights
 
-def rf_qw_tuned(X_train, y_train, X_test, y_test, X_std, percentile, weight, model_name, model_stats):
+def rf_pieceweight(X_train, y_train, X_test, y_test, X_std, y, percentile, weight, model_name, model_stats, percentile_model_stats):
     weights = weights_set(y_train, percentile, weight)
 
     rf_regressor = RandomForestRegressor(random_state=42)
@@ -47,36 +48,22 @@ def rf_qw_tuned(X_train, y_train, X_test, y_test, X_std, percentile, weight, mod
     y_predicted = current_model.predict(X_std)
 
     # save the model statistics
-    model_stats = colo_model_func.save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test, y_train_predicted,
-                               y_test_predicted)
+    X_std_values = X_std.values
+    model_stats = colo_model_func.save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                                               y_train_predicted, y_test_predicted, X_std_values, y, y_predicted)
+    percentile_model_stats = colo_model_func.save_percentile_outputs(percentile_model_stats, model_name, current_model,
+                                                                     X_train, X_test, y_train, y_test,
+                                                                     y_train_predicted, y_test_predicted, X_std_values,
+                                                                     y, y_predicted)
 
-    return model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
 
-
-def svr_qw_tuned(X_train, y_train, X_test, y_test, X_std, percentile, weight, model_name, model_stats):
+def lin_reg_pieceweight(X_train, y_train, X_test, y_test, X_std, y, percentile, weight, model_name, model_stats, percentile_model_stats):
     weights = weights_set(y_train, percentile, weight)
 
-    svr_regressor = SVR()
-    svr_params = {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
-                  'gamma': ['scale', 'auto'],
-                  'C': np.arange(0.1, 5, 0.4)}
-
-    # Create folds that are 5 chunks without shuffling the data
-    kf = KFold(n_splits=5, shuffle=False)
-
-    # cross validation to find the best parameter (see rf_params)
-    svr_cv = RandomizedSearchCV(svr_regressor, svr_params, random_state=42, cv=kf,
-                                scoring='neg_root_mean_squared_error')
-
-    # train the cross validation models
-    svr_cv.fit(X_train, y_train, sample_weight=weights)
-
-    # get the best parameters
-    best_params = svr_cv.best_params_
-    np.random.seed(42)
-
-    # train a new model with the best parameters
-    current_model = SVR(**best_params)
+    # Instantiate the LR model:
+    current_model = LinearRegression()
+    # train the model using training data
     current_model.fit(X_train, y_train, sample_weight=weights)
 
     # get the predicted y values for the model
@@ -84,8 +71,9 @@ def svr_qw_tuned(X_train, y_train, X_test, y_test, X_std, percentile, weight, mo
     y_test_predicted = current_model.predict(X_test)
     y_predicted = current_model.predict(X_std)
 
-    # save the model statistics
-    model_stats = colo_model_func.save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test, y_train_predicted,
-                               y_test_predicted)
+    X_std_values = X_std.values
+    model_stats = colo_model_func.save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train,y_test, y_train_predicted, y_test_predicted, X_std_values, y, y_predicted)
+    percentile_model_stats = colo_model_func.save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test, y_train,y_test, y_train_predicted, y_test_predicted, X_std_values, y, y_predicted)
 
-    return model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+

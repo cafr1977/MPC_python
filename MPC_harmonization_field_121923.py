@@ -25,17 +25,17 @@ hf_set = {}
 
 ####
 #edit the variables in this section for the harmonization - field run
-hf_set['hf_run_name'] = '' # #Name of the harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
+hf_set['hf_run_name'] = 'bysite' # #Name of the harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
                                                 # ^^ If you want the harmonization/field outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-colo_output_folder = 'Output_240528182037' #the code will pull the best_model from this, and also save new stuff into it
+colo_output_folder = 'Output_CH4_oct23aug24data_15min_midend' #the code will pull the best_model from this, and also save new stuff into it
 
 hf_set['run_field'] = True    #True if you want to apply calibration to field data,
                                     #False if you only want to look at harmonization data
-hf_set['best_model'] = 'random_forest'    #model that you would like to apply to field data from the output_folder
+hf_set['best_model'] = 'gradboost'    #model that you would like to apply to field data from the output_folder
 hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
-hf_set['field_plot_list'] = ['field_boxplot','field_timeseries'] #field plots: 'field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist'
+hf_set['field_plot_list'] = ['field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist'] #field plots: 'field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist'
                                 # ^^ harmonized_field_hist plots the field data after the harmonization correction is applied but before the field data is calibrated to the colocaiton model
-hf_set['harmon_plot_list'] = [] #harmonization plots: 'harmon_timeseries','harmon_stats_plot', 'harmon_scatter',
+hf_set['harmon_plot_list'] = ['harmon_timeseries','harmon_stats_plot'] #harmonization plots: 'harmon_timeseries','harmon_stats_plot', 'harmon_scatter',
 hf_set['TElapsed_in_harmon']= True   # if you have bookended harmonizations, it's a good idea to add in a time elapsed term to the harmonization models
                                     # if you do not have bookended harmonizaitons, adding in time elapsed is probs a bad idea because it will overcorrect.
 
@@ -212,6 +212,7 @@ for pod_num, podname in enumerate(pod_fitted):
     pod_fitted[podname] = pod_fitted[podname].set_index(X.index)
 
 # Harmonization plotting
+
 if 'harmon_stats_plot' in settings['harmon_plot_list']:
     plotting_func.harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, settings['sensors_included'])
     
@@ -220,6 +221,38 @@ if 'harmon_scatter' in settings['harmon_plot_list']:
     
 if 'harmon_timeseries' in settings['harmon_plot_list']:
     plotting_func.harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name)
+
+
+print('Saving important harmonization data...')
+# save preprocessed harmonization pod data
+excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_preprocessed_unfitted.xlsx')
+with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
+    # Iterate through the dictionary and write each DataFrame to a sheet
+    for sheet_name, df in preprocessed_harmon_data.items():
+        df.to_excel(writer, sheet_name=sheet_name)
+
+# save fitted harmonization pod data
+excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_harmonized.xlsx')
+with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
+    # Iterate through the dictionary and write each DataFrame to a sheet
+    for sheet_name, df in pod_fitted.items():
+        df.to_excel(writer, sheet_name=sheet_name)
+
+# save colocation pod harmonization data
+colo_pod_harmon_data.to_excel(
+    os.path.join('Outputs', colo_output_folder, output_folder_name, 'colo_pod_harmon_data.xlsx'))
+
+# save model stats
+for stat in model_stats:
+    excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, f'harmonization_{stat}_.xlsx')
+    with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
+        # Iterate through the dictionary and write each DataFrame to a sheet
+        for sheet_name, df in model_stats[stat].items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+harmonized_pods = list(pod_harmonization_data)
+del pod_harmonization_data, preprocessed_harmon_data, model_stats, X, X_train, X_test, temp, y, y_train, y_train_predicted, y_test, y_test_predicted
+
 
 
 ####### start field data
@@ -259,7 +292,7 @@ elif settings['run_field'] == True:
     pod_field_data = joblib.load(os.path.join('Outputs', colo_output_folder, 'pod_field_data.joblib'))
 
     # Check for pods in field_list not present in harmonization_list
-    not_in_harmonization = [item for item in field_pod_list if item not in list(pod_harmonization_data)]
+    not_in_harmonization = [item for item in field_pod_list if item not in harmonized_pods]
 
     # If there are items not in harmonization_list, raise a KeyError
     if not_in_harmonization:
@@ -385,7 +418,7 @@ elif settings['run_field'] == True:
 
 
     #save out important info
-    print('Saving important run data...')
+    print('Saving important field data...')
     #save y_field data by pod
     excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'y_field_estimates_by_pod.xlsx')
     with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
@@ -417,36 +450,11 @@ elif settings['run_field'] == True:
         # Iterate through the dictionary and write each DataFrame to a sheet
         for sheet_name, df in X_fitted_field_std.items():
             df.to_excel(writer, sheet_name=sheet_name)
-        
-#save preprocessed harmonization pod data
-excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_preprocessed_unfitted.xlsx')
-with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
-    # Iterate through the dictionary and write each DataFrame to a sheet
-    for sheet_name, df in preprocessed_harmon_data.items():
-        df.to_excel(writer, sheet_name=sheet_name)
 
 
-#save fitted harmonization pod data
-excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_harmonized.xlsx')
-with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
-    # Iterate through the dictionary and write each DataFrame to a sheet
-    for sheet_name, df in pod_fitted.items():
-        df.to_excel(writer, sheet_name=sheet_name)
-
-#save colocation pod harmonization data
-colo_pod_harmon_data.to_excel(os.path.join('Outputs', colo_output_folder, output_folder_name, 'colo_pod_harmon_data.xlsx'))
-
-#save settings
+# save settings
 joblib.dump(settings, os.path.join('Outputs', colo_output_folder, output_folder_name, 'run_settings.joblib'))
 
-#save harmonization lin reg models
-joblib.dump(harmonization_mdls, os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmonization_models.joblib'))
-   
-# save model stats
-for stat in model_stats:
-    excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, f'harmonization_{stat}_.xlsx')
-    with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
-        # Iterate through the dictionary and write each DataFrame to a sheet
-        for sheet_name, df in model_stats[stat].items():
-            df.to_excel(writer, sheet_name=sheet_name,index=False)
-
+# save harmonization lin reg models
+joblib.dump(harmonization_mdls,
+            os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmonization_models.joblib'))

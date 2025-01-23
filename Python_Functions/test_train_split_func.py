@@ -1,7 +1,15 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
+import pandas as pd
+
+def check_data(X,y):
+    if isinstance(X, np.ndarray):
+        X = pd.DataFrame(X)
+    return X, y
 
 def mid_end_split(test_percentage, X, y):
+    X, y = check_data(X, y)
+
     total_length = len(X)
     # Define the size of the middle and end portions of the test set (half of the total test percentage each)
     chunk_percentage = test_percentage / 2
@@ -29,13 +37,26 @@ def mid_end_split(test_percentage, X, y):
     return X_train, y_train, X_test, y_test
 
 def end_test(test_percentage, X, y):
+    X, y = check_data(X, y)
+
     #for 'end' traintest_split_type, we split the train and test so that the test data is the last part of the data
     split_index = int((1-test_percentage) * len(X))
     # Use train_test_split with shuffle=False so that it takes the last chunk as test set
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=len(X) - split_index, shuffle=False)
     return X_train, y_train, X_test, y_test
 
+def start_test(test_percentage, X, y):
+    X, y = check_data(X, y)
+
+    # Calculate the split index, taking the first 'test_percentage' part as the test set
+    split_index = int(test_percentage * len(X))
+    # Split the data without shuffling: first part is the test set
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=split_index, shuffle=False)
+    return X_train, y_train, X_test, y_test
+
 def start_end_split(test_percentage, X, y):
+    X, y = check_data(X, y)
+
     total_length = len(X)
     # Define the size of the middle and end portions of the test set (half of the total test percentage each)
     chunk_percentage = test_percentage / 2

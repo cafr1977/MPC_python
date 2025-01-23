@@ -5,7 +5,7 @@ Created on Tue Dec 19 14:33:19 2023
 @author: cfris
 """
 import pandas as pd
-from atmos import calculate
+#from atmos import calculate #testing what is broken
 from sklearn.preprocessing import PolynomialFeatures
 import numpy as np
 

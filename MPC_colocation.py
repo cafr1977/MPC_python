@@ -16,8 +16,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.preprocessing import StandardScaler  #pip install scikit-learn
 from datetime import datetime
+import numpy as np
 import importlib
 import joblib
+import sys
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, classification_report
 
 # Other packages that must be installed prior to running:
 # atmos (for humidity conversion)
@@ -42,26 +47,26 @@ settings={}
 
 #close previous figures
 plt.close('all')
-
-#Variable to change for your analysis
-settings['colo_run_name'] = ''  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
+#PM_5min_LinReg_pieceweight_sensitivity_startend_lotsofweights
+#Variable to change for your analysis #PM_5min_RandomForest_SigWeight_sensitivity
+settings['colo_run_name'] = 'TVOC_15min_midend_XGBoost_1'  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
 # ^^ If you want the outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-settings['ref_file_name'] = 'InnerPort_101023_031824_voc' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
+settings['ref_file_name'] = 'TVOC_editeddata_101023_081224_noDL' #Name of the reference CSV or XLSX file you are using (do not type .csv for the name)
 settings['ref_timezone'] = 'PST'
 settings['pollutant']='TVOC' #make sure this matches the column name in the reference data file (CSV or XLSX)
 settings['unit'] = 'ppb' #concentration units of the target pollutant (for plot labels)
-settings['time_interval'] = 60 #time averaging in minutes. needs to be at least as high as the time resolution of the reference data
+settings['time_interval'] = 15 #time averaging in minutes. needs to be at least as high as the time resolution of the reference data
 settings['retime_calc'] = "median" #How the time averaging is calculated. Options are median and mean right now and are the same for pod and ref
-settings['sensors_included'] = ["Fig2600",'Temperature','Humidity'] #list the sensors you want in the model (both pollutant and environmental, like temperature or humidity)
+settings['sensors_included'] = ["Fig2600",'Fig2602','Fig3','Temperature','Humidity'] #list the sensors you want in the model (both pollutant and environmental, like temperature or humidity)
 settings['scaler'] = StandardScaler() #How the data is scaled. StandardScaler is mean zero and st dev 1
-settings['t_warmup'] = 120 #warm up period in minutes
+settings['t_warmup'] = 60 #warm up period in minutes
 settings['test_percentage'] = 0.2 #what percentage of data goes into the test set, usually 0.2 or 0.3
 settings['traintest_split_type'] = 'mid_end_split' #how the data is split into train and test
 #start_end_split takes the % of the data at the start and % of data at the end to form test set
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
 
-settings['colo_plot_list'] = ['colo_timeseries','colo_scatter', 'colo_stats_plot','colo_residual'] # plots to plot and save
+settings['colo_plot_list'] = ['colo_stats_plot','colo_scatter','colo_timeseries'] # plots to plot and save
 #plot options:
 # colo_timeseries: timeseries of predicted Y and reference Y
 # colo_scatter: scatter plot of predicted vs. reference Y
@@ -70,16 +75,23 @@ settings['colo_plot_list'] = ['colo_timeseries','colo_scatter', 'colo_stats_plot
 # corr_heatmap: heat map of the correlations between each sensor column and the reference data
 # feature_importance: bar plot of the relative importance of the features used in machine learning models. does not work for linear models.
 
+settings['hybrid_classification'] = False
 
-settings['models']=['lin_reg','random_forest'] #which models are run on the data
+settings['models']=['xg_boost'] #which models are run on the data
+
+"""   'random_forest','random_forest_sigweight','random_forest_sigweight0_5','random_forest_sigweight1','random_forest_sigweight1_5',
+ 'random_forest_sigweight2','random_forest_sigweight2_5','random_forest_sigweight3'
+'lin_reg','lin_reg_sigweight','lin_reg_sigweight0_5','lin_reg_sigweight1','lin_reg_sigweight1_5','lin_reg_sigweight2',
+ 'lin_reg_sigweight2_5','lin_reg_sigweight3'  """
+
 #regular options: 'lin_reg','lasso','ridge','random_forest','adaboost', 'gradboost', 'svr_'
 #svr takes a long time
-#adaboost is usually a classification model, so it doesn't work great
+#adaboost is usually a classification model, so it d"{oesn't work great
 #lasso, ridge, random forest, adaboost, gradboost and svr are all common machine learning models.
 
-#peak weighting model options: 'rf_qw_tuned', 'svr_qw_tuned' (i haven't made the others because it doesn't seem helpful, can add easily though lmk.
+#peak weighting model options: 'rf_pieceweight', 'lin_reg_pieceweight' (i haven't made the others because it doesn't seem helpful, can add easily though lmk.
 
-settings['preprocess'] = ["rmv_warmup",'temp_C_2_K','hum_rel_2_abs']
+settings['preprocess'] = ["rmv_warmup",'temp_C_2_K']
 # temp_C_2_K": converts temperature from C to K, required for HumRel2Abs to run
 #hum_rel_2_abs: converts humidity from relative to absolute
 #rmv_warmup: Removes the first settings['t_warmup'] minutes of data, as well as settings['t_warmup'] minutes of data after the pod cuts out for more than 10 min
@@ -95,11 +107,12 @@ settings['preprocess'] = ["rmv_warmup",'temp_C_2_K','hum_rel_2_abs']
 
 #Sub settings for resampling/weighting preprocessing functions
 settings['quartiles_to_resample'] = ['first']   ##which quantiles you want to downsample from if applying 'resample_quartile' in 'preprocess
-settings['quartiles_downsampling_rate'] = 0.6   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
+settings['quartiles_downsampling_rate'] = 0.5   ## If using 'resample_quartile', choose a downsampling rate between 0-1 (e.g., keeping 70% of instances within the lower quartile)
 settings['n_bins']= 5   ## If using binned_resample, choose how many bins to split the data into.
 settings['binned_resample_binnum_multiplier'] = 2  #The number of samples per bin after resampling is set as 1/n_bins. However, this can be adjusted by mulitiplying 1/n by 'binned_resample_binnum_multiplier' if you don't want to remove so much data
-settings['weighting_percentile'] = [99.5,99.9] #list which percentiles to test for weighting. All data points in that percentile or higher will be weighted higher than those below.
-settings['weighting_weight'] = [10, 15, 20] #list what weights to test for a weighted model. All points above the percentile will be given this weight. Those below the percentile will ahve a weight of 1.
+settings['weighting_percentile'] = [99] #list which percentiles to test for weighting. All data points in that percentile or higher will be weighted higher than those below.
+#75, 80, 85, 90, 95, 99, 99.5, 99.9
+settings['weighting_weight'] = [0.1] #list what weights to test for a weighted model. All points above the percentile will be given this weight. Those below the percentile will ahve a weight of 1.
 
 #Column_names is a dictionary of column names lists that will be applied to pod data.
 # The name of the list corresponds to the deployment log "header_type" column
@@ -129,8 +142,14 @@ settings['column_names'] = {'3.1.0':
                                 "PID", "Mics2611", "CO_aux","CO_main", "CO2", "Temperature", "Pressure", "Humidity", "Quad1C1", "Quad1C2","Quad1C3","Quad1C4",
                                 "Quad2C1", "Quad2C2","Quad2C3","Quad2C4",'WS_mph','WD',
                                 "MQ131","PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
-                                "PM 25 um", "PM 50 um", "PM 100 um",'OPC1','OPC2','OPC3','OPC4','OPC5', 'unk']
+                                "PM 25 um", "PM 50 um", "PM 100 um",'OPC1','OPC2','OPC3','OPC4','OPC5', 'unk'],
 
+                            'jon':
+                            ["datetime","InputVoltage","Fig1","Fig2","Fig3_Heat","Fig3","Fig4_Heat","Fig4","e2vO3",
+                             "PID","CO_Aux","CO_Main","CO2","Temperature","Press","Humidity",
+                             "QS1_Aux","QS1_Main","QS2_Aux","QS2_Main","QS3_Aux","QS3_Main","QS4_Aux","QS4_Main",
+                             "PT_PM10ENV","PT_PM25ENV","PT_PM100ENV","PT_PM03um","PT_PM05um","PT_PM10um","PT_PM25um","PT_PM50um","PT_100um",
+                             "unk1","unk2","unk3","unk4","unk5","unk6","unk7","unk8","unk9"]
                             }
 
 ###############
@@ -143,8 +162,8 @@ if 'resample_quartile' in settings['preprocess'] and 'binned_resample' in settin
                      "Only one resample technique is allowed.")
 
 ### if rf_qw_tuned in models, then it should be the only model!
-if 'rf_qw_tuned' in settings['models'] or 'svr_qw_tuned' in settings['models'] and len(settings['models']) != 1:
-    raise ValueError("rf_qw_tuned must be used alone in settings['models']. You must test other models separately.")
+if ('rf_pieceweight' in settings['models'] or 'lin_reg_pieceweight' in settings['models']) and len(settings['models']) != 1:
+    raise ValueError("rf_pieceweight must be used alone in settings['models']. You must test other models separately.")
 
 
 #Create output folder
@@ -296,6 +315,9 @@ elif settings['traintest_split_type'] == 'mid_end_split':
 elif settings['traintest_split_type'] == 'start_end_split':
     X_train, y_train, X_test, y_test = test_train_split_func.start_end_split(settings['test_percentage'], X, y)
 
+elif settings['traintest_split_type'] == 'start_test':
+    X_train, y_train, X_test, y_test = test_train_split_func.start_test(settings['test_percentage'], X, y)
+
 else: 
     raise KeyError('Invalid traintest_split_type, run is ended')
 
@@ -324,14 +346,43 @@ y.to_csv(os.path.join('Outputs', output_folder_name, 'colo_y_reference.csv'))
 X.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X.csv'))
 
 #delete unneeded variables
-del y, X, X_train_std, X_test_std
+del X, X_train_std, X_test_std
+
+#set bounds for percentile stats
+# Create lower and upper percentiles
+#this will give stats for each quartile as well as the upper and lower 5%
+lower_percentiles = [0, 5, 25, 75, 95, 99, 99.5, 99.9]
+upper_percentiles = [5, 25, 75, 95, 99, 100, 100, 100]
+# Create MultiIndex from these two percentile lists
+percentile_index = pd.MultiIndex.from_tuples(list(zip(lower_percentiles, upper_percentiles)), names=['l_pct', 'u_pct'])
+
 
 ####Begin running models
 
+if settings['hybrid_classification'] == True:
+    pct_hybrid = 85
+    print(f'Hybrid classification is enabled. Percentile cut-off: {pct_hybrid}')
+
+
+    # Convert y into a binary classification target
+    y_test_class = (y_test > np.percentile(y, pct_hybrid)).astype(int)  # 1 if y > 90th percentile, else 0
+    y_train_class = (y_train > np.percentile(y, pct_hybrid)).astype(int)  # 1 if y > 90th percentile, else 0
+
+    # Create and train a Random Forest Classifier
+    model = RandomForestClassifier(random_state=42, class_weight='balanced')
+    model.fit(X_train, y_train_class)
+
+    # Predict and evaluate
+    y_pred_class = model.predict(X_test)
+    print("Accuracy:", accuracy_score(y_test_class, y_pred_class))
+    print("\nClassification Report:\n", classification_report(y_test_class, y_pred_class))
+
+
 #if using weighted models, proceed with the following code:
-if settings['models']== ['rf_qw_tuned'] or settings['models']== ['svr_qw_tuned']:  #if using a weighted tuning model
+if settings['models']== ['rf_pieceweight'] or settings['models']== ['lin_reg_pieceweight']:  #if using a weighted tuning model
     # first, establish a dataframe to save model statistics in
-    model_stats = pd.DataFrame(columns=['Training_R2','Testing_R2', 'Training_RMSE', 'Testing_RMSE', 'Training_MBE', 'Testing_MBE'])
+    model_stats = pd.DataFrame(columns=['Training_R2','Testing_R2','R2', 'Training_RMSE', 'Testing_RMSE', 'RMSE','Training_CRMSE', 'Testing_CRMSE','CRMSE', 'Training_MBE', 'Testing_MBE','MBE'])
+    percentile_model_stats = {}
 
     for p in settings['weighting_percentile']:
         for w in settings['weighting_weight']:
@@ -341,21 +392,26 @@ if settings['models']== ['rf_qw_tuned'] or settings['models']== ['svr_qw_tuned']
             # Appending an empty row to model stats with the model name index
             model_stats.loc[model_name] = [None] * len(model_stats.columns)
 
-            if settings['models'] == ['rf_qw_tuned']:
+            percentile_model_stats[model_name] = pd.DataFrame(index=percentile_index,
+                                                         columns=['Training_R2', 'Testing_R2', 'R2','Training_RMSE',
+                                                                  'Testing_RMSE','RMSE','Training_CRMSE', 'Testing_CRMSE',
+                                                                  'CRMSE','Training_MBE', 'Testing_MBE','MBE'])
+
+            if settings['models'] == ['rf_pieceweight']:
                 print(f'Fitting colocation pod data to reference data using weighted random forest with p= {p_str} and w= {w_str}...')
-                model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.rf_qw_tuned(X_train, y_train,
+                percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.rf_pieceweight(X_train, y_train,
                                                                                                        X_test, y_test,
-                                                                                                       X_std, p,
+                                                                                                       X_std, y, p,
                                                                                                        w, model_name,
-                                                                                                       model_stats)
-            elif settings['models'] == ['svr_qw_tuned']:
-                print(f'Fitting colocation pod data to reference data using weighted SVR with p= {p_str} and w= {w_str}...')
-                model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.svr_qw_tuned(
+                                                                                                       model_stats, percentile_model_stats)
+            elif settings['models'] == ['lin_reg_pieceweight']:
+                print(f'Fitting colocation pod data to reference data using weighted MLR with p= {p_str} and w= {w_str}...')
+                percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = weighting_grid.lin_reg_pieceweight(
                     X_train, y_train,
                     X_test, y_test,
-                    X_std, p,
+                    X_std, y, p,
                     w, model_name,
-                    model_stats)
+                    model_stats, percentile_model_stats)
 
             # save out the model and the y predicted
             y_predicted = pd.DataFrame(data=y_predicted, columns=[settings['pollutant']], index=X_std.index)
@@ -371,7 +427,18 @@ if settings['models']== ['rf_qw_tuned'] or settings['models']== ['svr_qw_tuned']
 else:
     #if not using weighted models, proceed with this code:
     #first, establish a dataframe to save model statistics in
-    model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Testing_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
+    model_stats=pd.DataFrame(index=settings['models'], columns = ['Training_R2','Testing_R2','R2','Training_RMSE','Testing_RMSE','RMSE','Training_CRMSE', 'Testing_CRMSE', 'CRMSE','Training_MBE','Testing_MBE','MBE'])
+
+    #percentile model stats (for understanding how the statistics change at different percentiles
+    # Initialize model_stats as a dictionary
+    percentile_model_stats = {}
+
+    # Loop over the models and create a DataFrame for each model with the percentiles as the index
+    for model in settings['models']:
+        percentile_model_stats[model] = pd.DataFrame(index=percentile_index,
+                                          columns=['Training_R2', 'Testing_R2', 'R2','Training_RMSE', 'Testing_RMSE','RMSE',
+                                                   'Training_CRMSE', 'Testing_CRMSE','CRMSE','Training_MBE', 'Testing_MBE','MBE'])
+
     #models_folder = "Python_Functions." + "models"
     for i, model_name in enumerate(settings['models']):
         print(f'Fitting colocation pod data to reference data using model {model_name}...')
@@ -380,7 +447,7 @@ else:
         # Get the function from the module
         model_func = getattr(model_module, model_name)
         # Call the function to apply the model_name model
-        model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = model_func(X_train, y_train, X_test, y_test,X_std_values,model_name,model_stats)
+        percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model = model_func(X_train, y_train, X_test, y_test, X_std_values, y, model_name,model_stats, percentile_model_stats,settings)
 
         #save out the model and the y predicted
         y_predicted = pd.DataFrame(data = y_predicted, columns = [settings['pollutant']], index = X_std.index)
@@ -396,7 +463,12 @@ else:
 
 
 #save out the model for later analysis and use in field data
-model_stats.to_csv(os.path.join('Outputs', output_folder_name, 'colo_model_stats.csv'), index = True)
+model_stats.to_csv(os.path.join('Outputs', output_folder_name, f'colo_model_stats_{settings["colo_run_name"]}.csv'), index = True)
+
+with pd.ExcelWriter(os.path.join('Outputs', output_folder_name, f'colo_model_percentile_stats_{settings["colo_run_name"]}.xlsx'), engine='xlsxwriter') as writer:
+    for sheet_name, df in percentile_model_stats.items():
+        # Write each DataFrame to a specific sheet
+        df.to_excel(writer, sheet_name=sheet_name, index=True)
 
 #stats_plot plots the R2, RMSE, and MBE of train and test data as a bar graph
 if "colo_stats_plot" in settings['colo_plot_list']:
@@ -404,3 +476,8 @@ if "colo_stats_plot" in settings['colo_plot_list']:
     
 #save out settings for future reference
 joblib.dump(settings, os.path.join('Outputs', output_folder_name, 'run_settings.joblib'))
+'''
+'''
+
+
+

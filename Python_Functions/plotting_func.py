@@ -7,7 +7,7 @@ import seaborn as sns
 import numpy as np
 import copy
 import pandas as pd
-
+import math
 
 #Colocation plots
 def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name,run_name, unit):
@@ -361,7 +361,7 @@ def harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, outp
     tab20_cmap = plt.cm.get_cmap('tab20')
 
     # Generate a list of 30 colors from the tab20 colormap
-    tab20_colors = [tab20_cmap(i) for i in range(30)]
+    tab20_colors = [tab20_cmap(i) for i in range(40)]
 
     # Iterate over each sensor
     for i, sensor in enumerate(colo_pod_harmon_data):
@@ -397,7 +397,7 @@ def harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, outp
     # harmon_timeseries(colo_pod_harmon_data, pod_fitted, 'ColoOutputFolder', 'OutputFolderName')
 def harmon_scatter(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name):
     # Create subplots for each sensor in colo_pod_harmon_data
-    fig, axs = plt.subplots(nrows=round(colo_pod_harmon_data.shape[1] / 2), ncols=2,
+    fig, axs = plt.subplots(nrows=math.ceil(colo_pod_harmon_data.shape[1] / 2), ncols=2,
                             figsize=(10, 3 * round(colo_pod_harmon_data.shape[1] / 2)))
 
     # Flatten the axs array to iterate over it
