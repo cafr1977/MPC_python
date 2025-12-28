@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import Lasso
-from sklearn.model_selection import RandomizedSearchCV, KFold
+from sklearn.model_selection import RandomizedSearchCV, KFold, GridSearchCV
 from sklearn.linear_model import Ridge
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
@@ -244,7 +244,7 @@ def lasso(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, p
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (alpha)
-    lasso_cv = RandomizedSearchCV(lasso_model, lasso_params_grid, cv=kf, scoring='neg_root_mean_squared_error',
+    lasso_cv = RandomizedSearchCV(lasso_model, lasso_params_grid, cv=kf, scoring='neg_mean_squared_error',
                                   random_state=42)
 
     # train the cross validation models
@@ -275,7 +275,7 @@ def ridge(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, p
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (alpha)
-    ridge_cv = RandomizedSearchCV(ridge_model, ridge_params_grid, cv=kf, scoring='neg_root_mean_squared_error',
+    ridge_cv = RandomizedSearchCV(ridge_model, ridge_params_grid, cv=kf, scoring='neg_mean_squared_error',
                                   random_state=42)
     # train the cross validation models
     ridge_cv.fit(X_train, y_train)
@@ -296,41 +296,6 @@ def ridge(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, p
                                                      y_train, y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
     return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
 
-def random_forest_withestimators(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
-    rf_regressor = RandomForestRegressor(random_state=42)
-    rf_params = {'max_depth': np.arange(1, 10, 1),
-                 'min_samples_split': np.arange(2, 50, 1),
-                 'min_samples_leaf': np.arange(2, 50, 1),
-                 'n_estimators': np.arange(20, 101, 20),
-                 'max_features': ['sqrt', 'log2']}
-    # Create folds that are 5 chunks without shuffling the data
-    kf = KFold(n_splits=5, shuffle=False)
-
-    # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
-                                         random_state=42)
-    # train the cross validation models
-    rf_regressor_cv.fit(X_train, y_train)
-    # get the best parameters
-    best_params = rf_regressor_cv.best_params_
-    np.random.seed(42)
-
-    # train a new model with the best parameters
-    current_model = RandomForestRegressor(**best_params)
-    current_model.fit(X_train, y_train)
-
-    # get the predicted y values for the model
-    y_train_predicted = current_model.predict(X_train)
-    y_test_predicted = current_model.predict(X_test)
-    y_predicted = current_model.predict(X_std)
-
-    # save the model statistics
-    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train,y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
-                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-
-    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
-
 def random_forest(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
     rf_regressor = RandomForestRegressor(random_state=42)
     rf_params = {'max_depth': np.arange(1, 10, 1),
@@ -341,107 +306,7 @@ def random_forest(X_train, y_train, X_test, y_test, X_std, y, model_name, model_
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
-                                         random_state=42)
-    # train the cross validation models
-    rf_regressor_cv.fit(X_train, y_train)
-    # get the best parameters
-    best_params = rf_regressor_cv.best_params_
-    np.random.seed(42)
-
-    # train a new model with the best parameters
-    current_model = RandomForestRegressor(**best_params)
-    current_model.fit(X_train, y_train)
-
-    # get the predicted y values for the model
-    y_train_predicted = current_model.predict(X_train)
-    y_test_predicted = current_model.predict(X_test)
-    y_predicted = current_model.predict(X_std)
-
-    # save the model statistics
-    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train,y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
-                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-
-    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
-
-def random_forest_jon(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
-    rf_regressor = RandomForestRegressor(random_state=42)
-    rf_params = {
-                 'min_samples_leaf': np.arange(2, 50, 1),
-                 'n_estimators': np.arange(20, 401, 20)}
-    # Create folds that are 5 chunks without shuffling the data
-    kf = KFold(n_splits=5, shuffle=False)
-
-    # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
-                                         random_state=42)
-    # train the cross validation models
-    rf_regressor_cv.fit(X_train, y_train)
-    # get the best parameters
-    best_params = rf_regressor_cv.best_params_
-    np.random.seed(42)
-
-    # train a new model with the best parameters
-    current_model = RandomForestRegressor(**best_params)
-    current_model.fit(X_train, y_train)
-
-    # get the predicted y values for the model
-    y_train_predicted = current_model.predict(X_train)
-    y_test_predicted = current_model.predict(X_test)
-    y_predicted = current_model.predict(X_std)
-
-    # save the model statistics
-    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train,y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
-                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-
-    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
-
-def random_forest_jon3(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
-    rf_regressor = RandomForestRegressor(random_state=42)
-    rf_params = {'max_depth': np.arange(1, 10, 1),
-                 'min_samples_leaf': np.arange(2, 50, 1),
-                 'n_estimators': np.arange(20, 401, 20),
-                 'max_features': ['sqrt', 'log2']}
-    # Create folds that are 5 chunks without shuffling the data
-    kf = KFold(n_splits=5, shuffle=False)
-
-    # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
-                                         random_state=42)
-    # train the cross validation models
-    rf_regressor_cv.fit(X_train, y_train)
-    # get the best parameters
-    best_params = rf_regressor_cv.best_params_
-    np.random.seed(42)
-
-    # train a new model with the best parameters
-    current_model = RandomForestRegressor(**best_params)
-    current_model.fit(X_train, y_train)
-
-    # get the predicted y values for the model
-    y_train_predicted = current_model.predict(X_train)
-    y_test_predicted = current_model.predict(X_test)
-    y_predicted = current_model.predict(X_std)
-
-    # save the model statistics
-    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train,y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
-                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-
-    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
-
-def random_forest_no_minsampspl(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
-    rf_regressor = RandomForestRegressor(random_state=42)
-    rf_params = {'max_depth': np.arange(1, 10, 1),
-                 'min_samples_leaf': np.arange(2, 50, 1),
-                 'max_features': ['sqrt', 'log2']}
-    # Create folds that are 5 chunks without shuffling the data
-    kf = KFold(n_splits=5, shuffle=False)
-
-    # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train)
@@ -475,7 +340,7 @@ def adaboost(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats
     # Create folds that are 5 chunks without shuffling the data
     kf = KFold(n_splits=5, shuffle=False)
 
-    adaboost_cv = RandomizedSearchCV(adaboost, adaboost_params, random_state=42, cv=kf, scoring='neg_root_mean_squared_error')
+    adaboost_cv = RandomizedSearchCV(adaboost, adaboost_params, random_state=42, cv=kf, scoring='neg_mean_squared_error')
     # train the cross validation models
     adaboost_cv.fit(X_train, y_train)
 
@@ -500,17 +365,26 @@ def adaboost(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats
 
 def gradboost(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
     gb_regressor = GradientBoostingRegressor(random_state=42)
-    gb_params = dict(learning_rate=np.arange(0.05, 0.3, 0.05),
-                     n_estimators=np.arange(100, 1000, 100),
+    gb_params = dict(learning_rate= [0.01, 0.05, 0.1, 0.2, 0.3],
+                     n_estimators=[50, 100, 300, 500, 750, 1000],
+                     subsample= [0.3, 0.5, 0.7, 0.9, 1.0],
+                     max_depth= [1, 3, 5, 7, 10],
+                     max_features=['sqrt', 'log2', None],
+                     min_samples_split= [2, 5, 10],
+                     min_samples_leaf=[1, 3, 5, 10])
+
+    ''' #old params
+    dict(learning_rate=np.arange(0.05, 0.3, 0.05),
+                     n_estimators=[50, 100, 300, 500, 800, 1000],
                      subsample=np.arange(0.1, 0.9, 0.05),
                      max_depth=[int(i) for i in np.arange(1, 10, 1)],
-                     max_features=['sqrt', 'log2'])
+                     max_features=['sqrt', 'log2'])'''
 
     # Create folds that are 5 chunks without shuffling the data
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    gb_cv = RandomizedSearchCV(gb_regressor, gb_params, random_state=42, cv=kf, scoring='neg_root_mean_squared_error')
+    gb_cv = RandomizedSearchCV(gb_regressor, gb_params, random_state=42, cv=kf, scoring='neg_mean_squared_error')
 
     # train the cross validation models
     gb_cv.fit(X_train, y_train)
@@ -540,15 +414,29 @@ def xg_boost(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats
 
     # Define the parameter grid for RandomizedSearchCV
     xgb_params = {
-    'n_estimators': [100, 300, 500, 800],
-    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
-    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
-    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
-    "min_child_weight": [1, 3, 5, 7],  # Default is 1
-    "max_depth": np.append(0, np.arange(3, 16)),  # Default is 6
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+    'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+    'colsample_bytree': [0.5, 0.75, 1.0],
+    "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+    "max_depth": [1, 3, 5, 7, 10],  # Default is 6
     "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
     "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
     }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+
     # Create folds that are 5 chunks without shuffling the data
     kf = KFold(n_splits=5, shuffle=False)
 
@@ -586,83 +474,17 @@ def xg_boost(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats
 
     return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
 
-def xg_boost_earlystop(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
-    # Create an XGBoost regressor object
-    xgb_regressor = xgb.XGBRegressor(n_estimators=10000, early_stopping_rounds=20, n_jobs=-1, random_state=46)
-
-    # Train and Test split
-    if settings['traintest_split_type'] == 'end_test':
-        X_train2, y_train2, X_val, y_val = test_train_split_func.end_test(settings['test_percentage'], X_train, y_train)
-
-    elif settings['traintest_split_type'] == 'mid_end_split':
-        X_train2, y_train2, X_val, y_val = test_train_split_func.mid_end_split(settings['test_percentage'], X_train, y_train)
-
-    elif settings['traintest_split_type'] == 'start_end_split':
-        X_train2, y_train2, X_val, y_val = test_train_split_func.start_end_split(settings['test_percentage'], X_train, y_train)
-
-    elif settings['traintest_split_type'] == 'start_test':
-        X_train2, y_train2, X_val, y_val = test_train_split_func.start_test(settings['test_percentage'], X_train, y_train)
-
-    # Define the parameter grid for RandomizedSearchCV
-    xgb_params = {
-    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
-    "subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
-    "colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
-    "min_child_weight": [1, 3, 5, 7],  # Default is 1
-    "max_depth": np.append(0, np.arange(3, 16)),  # Default is 6
-    "alpha": [0, 0.01, 1, 2, 5, 7, 10, 50, 100],  # Default is 0. AKA reg_alpha.
-    "lambda": [0, 0.01, 1, 5, 10, 20, 50, 100]  # Default is 0. AKA reg_lambda.
-    }
-    # Create folds that are 5 chunks without shuffling the data
-    kf = KFold(n_splits=5, shuffle=False)
-
-    # Create a RandomizedSearchCV object
-    xgb_cv = RandomizedSearchCV(
-        estimator=xgb_regressor,
-        param_distributions=xgb_params,
-        n_iter=60,  # Number of parameter settings that are sampled
-        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
-        cv=kf,  # Number of cross-validation folds
-        n_jobs=-1,  # Use all available cores for parallel processing
-    )
-
-    # train the cross validation models
-    xgb_cv.fit(X_train2, y_train2,
-                  eval_set=[(X_val, y_val)],
-                  verbose=False)
-    # get the best parameters
-    best_params = xgb_cv.best_params_
-    np.random.seed(42)
-
-    # train a new model with the best parameters
-    current_model = xgb.XGBRegressor(**best_params)
-    current_model.fit(X_train, y_train)
-    # get the predicted y values for the model
-    y_train_predicted = current_model.predict(X_train).squeeze()
-    y_test_predicted = current_model.predict(X_test).squeeze()
-    y_predicted = current_model.predict(X_std).squeeze()
-
-    # save the model statistics
-    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
-                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
-    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
-                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
-                                                     y_predicted)
-
-    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
-
-
 def svr_(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
     svr_regressor = SVR()
     svr_params = {'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],
                   'gamma': ['scale', 'auto'],
-                  'C': np.arange(0.1, 5, 0.4)}
+                  'C': [0.1, 1, 10, 100]}
 
     # Create folds that are 5 chunks without shuffling the data
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    svr_cv = RandomizedSearchCV(svr_regressor, svr_params, random_state=42, cv=kf, scoring='neg_root_mean_squared_error')
+    svr_cv = RandomizedSearchCV(svr_regressor, svr_params, random_state=42, cv=kf, scoring='neg_mean_squared_error')
 
     # train the cross validation models
     svr_cv.fit(X_train, y_train)
@@ -711,7 +533,7 @@ def random_forest_SMOTER(X_train, y_train, X_test, y_test, X_std, y, model_name,
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train)
@@ -746,7 +568,7 @@ def random_forest_sigweight(X_train, y_train, X_test, y_test, X_std, y, model_na
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train, sample_weight=weights)
@@ -782,7 +604,7 @@ def random_forest_sigweight0_5(X_train, y_train, X_test, y_test, X_std, y, model
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train, sample_weight=weights)
@@ -819,7 +641,7 @@ def random_forest_sigweight1(X_train, y_train, X_test, y_test, X_std, y, model_n
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train, sample_weight=weights)
@@ -855,7 +677,7 @@ def random_forest_sigweight1_5(X_train, y_train, X_test, y_test, X_std, y, model
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train, sample_weight=weights)
@@ -891,7 +713,7 @@ def random_forest_sigweight2(X_train, y_train, X_test, y_test, X_std, y, model_n
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train, sample_weight=weights)
@@ -927,7 +749,7 @@ def random_forest_sigweight2_5(X_train, y_train, X_test, y_test, X_std, y, model
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train, sample_weight=weights)
@@ -964,7 +786,7 @@ def random_forest_sigweight3(X_train, y_train, X_test, y_test, X_std, y, model_n
     kf = KFold(n_splits=5, shuffle=False)
 
     # cross validation to find the best parameter (see rf_params)
-    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_root_mean_squared_error',
+    rf_regressor_cv = RandomizedSearchCV(rf_regressor, rf_params, cv=kf, scoring='neg_mean_squared_error',
                                          random_state=42)
     # train the cross validation models
     rf_regressor_cv.fit(X_train, y_train, sample_weight=weights)
@@ -1127,3 +949,487 @@ def lin_reg_sigweight3(X_train, y_train, X_test, y_test, X_std, y, model_name, m
                                                      y_train, y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
 
     return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+
+def xg_boost_sigweight(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
+    y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+    weights = 1/(1+np.exp(-y_train_zscore))**2
+    # Create an XGBoost regressor object
+    xgb_regressor = xgb.XGBRegressor()
+
+    # Define the parameter grid for RandomizedSearchCV
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+    'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+    'colsample_bytree': [0.5, 0.75, 1.0],
+    "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+    "max_depth": [1, 3, 5, 7, 10],  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+
+    # Create folds that are 5 chunks without shuffling the data
+    kf = KFold(n_splits=5, shuffle=False)
+
+    # Create a RandomizedSearchCV object
+    xgb_cv = RandomizedSearchCV(
+        estimator=xgb_regressor,
+        param_distributions=xgb_params,
+        n_iter=200,  # Number of parameter settings that are sampled
+        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
+        cv=kf,  # Number of cross-validation folds
+        random_state=42,  # Set random state for reproducibility
+        n_jobs=-1,  # Use all available cores for parallel processing
+    )
+
+    # train the cross validation models
+    xgb_cv.fit(X_train, y_train, sample_weight=weights)
+    # get the best parameters
+    best_params = xgb_cv.best_params_
+    np.random.seed(42)
+
+    # train a new model with the best parameters
+    current_model = xgb.XGBRegressor(**best_params)
+    current_model.fit(X_train, y_train, sample_weight=weights)
+    # get the predicted y values for the model
+    y_train_predicted = current_model.predict(X_train)
+    y_test_predicted = current_model.predict(X_test)
+    y_predicted = current_model.predict(X_std)
+
+    # save the model statistics
+    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
+    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
+                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
+                                                     y_predicted)
+
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+
+def xg_boost_sigweight0_5(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
+    y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+    weights = 1/(1+np.exp(-y_train_zscore+0.5))**2
+
+    # Create an XGBoost regressor object
+    xgb_regressor = xgb.XGBRegressor()
+
+    # Define the parameter grid for RandomizedSearchCV
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+    'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+    'colsample_bytree': [0.5, 0.75, 1.0],
+    "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+    "max_depth": [1, 3, 5, 7, 10],  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+
+    # Create folds that are 5 chunks without shuffling the data
+    kf = KFold(n_splits=5, shuffle=False)
+
+    # Create a RandomizedSearchCV object
+    xgb_cv = RandomizedSearchCV(
+        estimator=xgb_regressor,
+        param_distributions=xgb_params,
+        n_iter=200,  # Number of parameter settings that are sampled
+        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
+        cv=kf,  # Number of cross-validation folds
+        random_state=42,  # Set random state for reproducibility
+        n_jobs=-1,  # Use all available cores for parallel processing
+    )
+
+    # train the cross validation models
+    xgb_cv.fit(X_train, y_train, sample_weight=weights)
+    # get the best parameters
+    best_params = xgb_cv.best_params_
+    np.random.seed(42)
+
+    # train a new model with the best parameters
+    current_model = xgb.XGBRegressor(**best_params)
+    current_model.fit(X_train, y_train, sample_weight=weights)
+    # get the predicted y values for the model
+    y_train_predicted = current_model.predict(X_train)
+    y_test_predicted = current_model.predict(X_test)
+    y_predicted = current_model.predict(X_std)
+
+    # save the model statistics
+    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
+    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
+                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
+                                                     y_predicted)
+
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+
+
+def xg_boost_sigweight1(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats,
+                          settings):
+    y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+    weights = 1 / (1 + np.exp(-y_train_zscore + 1)) ** 2
+
+    # Create an XGBoost regressor object
+    xgb_regressor = xgb.XGBRegressor()
+
+    # Define the parameter grid for RandomizedSearchCV
+    xgb_params = {
+        'n_estimators': [50, 100, 300, 500, 800, 1000],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+        'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+        'colsample_bytree': [0.5, 0.75, 1.0],
+        "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+        "max_depth": [1, 3, 5, 7, 10],  # Default is 6
+        "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+        "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+    # Create folds that are 5 chunks without shuffling the data
+    kf = KFold(n_splits=5, shuffle=False)
+
+    # Create a RandomizedSearchCV object
+    xgb_cv = RandomizedSearchCV(
+        estimator=xgb_regressor,
+        param_distributions=xgb_params,
+        n_iter=200,  # Number of parameter settings that are sampled
+        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
+        cv=kf,  # Number of cross-validation folds
+        random_state=42,  # Set random state for reproducibility
+        n_jobs=-1,  # Use all available cores for parallel processing
+    )
+
+    # train the cross validation models
+    xgb_cv.fit(X_train, y_train, sample_weight=weights)
+    # get the best parameters
+    best_params = xgb_cv.best_params_
+    np.random.seed(42)
+
+    # train a new model with the best parameters
+    current_model = xgb.XGBRegressor(**best_params)
+    current_model.fit(X_train, y_train, sample_weight=weights)
+    # get the predicted y values for the model
+    y_train_predicted = current_model.predict(X_train)
+    y_test_predicted = current_model.predict(X_test)
+    y_predicted = current_model.predict(X_std)
+
+    # save the model statistics
+    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
+    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
+                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
+                                                     y_predicted)
+
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+
+def xg_boost_sigweight1_5(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats,
+                          settings):
+    y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+    weights = 1 / (1 + np.exp(-y_train_zscore + 1.5)) ** 2
+
+    # Create an XGBoost regressor object
+    xgb_regressor = xgb.XGBRegressor()
+
+    # Define the parameter grid for RandomizedSearchCV
+    xgb_params = {
+        'n_estimators': [50, 100, 300, 500, 800, 1000],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+        'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+        'colsample_bytree': [0.5, 0.75, 1.0],
+        "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+        "max_depth": [1, 3, 5, 7, 10],  # Default is 6
+        "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+        "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+    # Create folds that are 5 chunks without shuffling the data
+    kf = KFold(n_splits=5, shuffle=False)
+
+    # Create a RandomizedSearchCV object
+    xgb_cv = RandomizedSearchCV(
+        estimator=xgb_regressor,
+        param_distributions=xgb_params,
+        n_iter=200,  # Number of parameter settings that are sampled
+        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
+        cv=kf,  # Number of cross-validation folds
+        random_state=42,  # Set random state for reproducibility
+        n_jobs=-1,  # Use all available cores for parallel processing
+    )
+
+    # train the cross validation models
+    xgb_cv.fit(X_train, y_train, sample_weight=weights)
+    # get the best parameters
+    best_params = xgb_cv.best_params_
+    np.random.seed(42)
+
+    # train a new model with the best parameters
+    current_model = xgb.XGBRegressor(**best_params)
+    current_model.fit(X_train, y_train, sample_weight=weights)
+    # get the predicted y values for the model
+    y_train_predicted = current_model.predict(X_train)
+    y_test_predicted = current_model.predict(X_test)
+    y_predicted = current_model.predict(X_std)
+
+    # save the model statistics
+    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
+    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
+                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
+                                                     y_predicted)
+
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+
+def xg_boost_sigweight2(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats,
+                          settings):
+    y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+    weights = 1 / (1 + np.exp(-y_train_zscore + 2)) ** 2
+
+    # Create an XGBoost regressor object
+    xgb_regressor = xgb.XGBRegressor()
+
+    # Define the parameter grid for RandomizedSearchCV
+    xgb_params = {
+        'n_estimators': [50, 100, 300, 500, 800, 1000],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+        'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+        'colsample_bytree': [0.5, 0.75, 1.0],
+        "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+        "max_depth": [1, 3, 5, 7, 10],  # Default is 6
+        "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+        "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+    # Create folds that are 5 chunks without shuffling the data
+    kf = KFold(n_splits=5, shuffle=False)
+
+    # Create a RandomizedSearchCV object
+    xgb_cv = RandomizedSearchCV(
+        estimator=xgb_regressor,
+        param_distributions=xgb_params,
+        n_iter=200,  # Number of parameter settings that are sampled
+        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
+        cv=kf,  # Number of cross-validation folds
+        random_state=42,  # Set random state for reproducibility
+        n_jobs=-1,  # Use all available cores for parallel processing
+    )
+
+    # train the cross validation models
+    xgb_cv.fit(X_train, y_train, sample_weight=weights)
+    # get the best parameters
+    best_params = xgb_cv.best_params_
+    np.random.seed(42)
+
+    # train a new model with the best parameters
+    current_model = xgb.XGBRegressor(**best_params)
+    current_model.fit(X_train, y_train, sample_weight=weights)
+    # get the predicted y values for the model
+    y_train_predicted = current_model.predict(X_train)
+    y_test_predicted = current_model.predict(X_test)
+    y_predicted = current_model.predict(X_std)
+
+    # save the model statistics
+    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
+    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
+                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
+                                                     y_predicted)
+
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+
+def xg_boost_sigweight2_5(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats,
+                          settings):
+    y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+    weights = 1 / (1 + np.exp(-y_train_zscore + 2.5)) ** 2
+
+    # Create an XGBoost regressor object
+    xgb_regressor = xgb.XGBRegressor()
+
+    # Define the parameter grid for RandomizedSearchCV
+    xgb_params = {
+        'n_estimators': [50, 100, 300, 500, 800, 1000],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+        'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+        'colsample_bytree': [0.5, 0.75, 1.0],
+        "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+        "max_depth": [1, 3, 5, 7, 10],  # Default is 6
+        "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+        "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+    # Create folds that are 5 chunks without shuffling the data
+    kf = KFold(n_splits=5, shuffle=False)
+
+    # Create a RandomizedSearchCV object
+    xgb_cv = RandomizedSearchCV(
+        estimator=xgb_regressor,
+        param_distributions=xgb_params,
+        n_iter=200,  # Number of parameter settings that are sampled
+        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
+        cv=kf,  # Number of cross-validation folds
+        random_state=42,  # Set random state for reproducibility
+        n_jobs=-1,  # Use all available cores for parallel processing
+    )
+
+    # train the cross validation models
+    xgb_cv.fit(X_train, y_train, sample_weight=weights)
+    # get the best parameters
+    best_params = xgb_cv.best_params_
+    np.random.seed(42)
+
+    # train a new model with the best parameters
+    current_model = xgb.XGBRegressor(**best_params)
+    current_model.fit(X_train, y_train, sample_weight=weights)
+    # get the predicted y values for the model
+    y_train_predicted = current_model.predict(X_train)
+    y_test_predicted = current_model.predict(X_test)
+    y_predicted = current_model.predict(X_std)
+
+    # save the model statistics
+    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
+    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
+                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
+                                                     y_predicted)
+
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+
+def xg_boost_sigweight3(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats,
+                          settings):
+    y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
+    weights = 1 / (1 + np.exp(-y_train_zscore + 3)) ** 2
+
+    # Create an XGBoost regressor object
+    xgb_regressor = xgb.XGBRegressor()
+
+    # Define the parameter grid for RandomizedSearchCV
+    xgb_params = {
+        'n_estimators': [50, 100, 300, 500, 800, 1000],
+        "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],  # Default is 0.3. Ranges from loc to loc+scale.
+        'subsample': [0.3, 0.5, 0.7, 0.9, 1.0],
+        'colsample_bytree': [0.5, 0.75, 1.0],
+        "min_child_weight": [1, 3, 5, 7, 10],  # Default is 1
+        "max_depth": [1, 3, 5, 7, 10],  # Default is 6
+        "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+        "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }
+
+    ''' #old params
+    xgb_params = {
+    'n_estimators': [50, 100, 300, 500, 800, 1000],
+    "learning_rate": scipy.stats.uniform(loc=0.003, scale=0.19),  # Default is 0.3. Ranges from loc to loc+scale.
+    #"subsample": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    #"colsample_bytree": scipy.stats.uniform(loc=0.5, scale=0.5),  # Default is 1
+    "min_child_weight": [1, 3, 5, 7,10],  # Default is 1
+    "max_depth": np.append(0, np.arange(1, 10)),  # Default is 6
+    "alpha": [0, 0.01, 1, 5, 10, 50, 100],  # Default is 0. AKA reg_alpha.
+    "lambda": [0, 0.01, 1, 5, 10, 50, 100]  # Default is 0. AKA reg_lambda.
+    }'''
+
+    # Create folds that are 5 chunks without shuffling the data
+    kf = KFold(n_splits=5, shuffle=False)
+
+    # Create a RandomizedSearchCV object
+    xgb_cv = RandomizedSearchCV(
+        estimator=xgb_regressor,
+        param_distributions=xgb_params,
+        n_iter=200,  # Number of parameter settings that are sampled
+        scoring='neg_mean_squared_error',  # Use negative MSE as the scoring metric
+        cv=kf,  # Number of cross-validation folds
+        random_state=42,  # Set random state for reproducibility
+        n_jobs=-1,  # Use all available cores for parallel processing
+    )
+
+    # train the cross validation models
+    xgb_cv.fit(X_train, y_train, sample_weight=weights)
+    # get the best parameters
+    best_params = xgb_cv.best_params_
+    np.random.seed(42)
+
+    # train a new model with the best parameters
+    current_model = xgb.XGBRegressor(**best_params)
+    current_model.fit(X_train, y_train, sample_weight=weights)
+    # get the predicted y values for the model
+    y_train_predicted = current_model.predict(X_train)
+    y_test_predicted = current_model.predict(X_test)
+    y_predicted = current_model.predict(X_std)
+
+    # save the model statistics
+    model_stats = save_outputs(model_stats, model_name, current_model, X_train, X_test, y_train, y_test,
+                               y_train_predicted, y_test_predicted, X_std, y, y_predicted)
+    percentile_model_stats = save_percentile_outputs(percentile_model_stats, model_name, current_model, X_train, X_test,
+                                                     y_train, y_test, y_train_predicted, y_test_predicted, X_std, y,
+                                                     y_predicted)
+
+    return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+

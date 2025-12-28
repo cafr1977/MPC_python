@@ -8,6 +8,8 @@ import numpy as np
 import copy
 import pandas as pd
 import math
+from bokeh.palettes import Category20b, Category20c
+import re
 
 #Colocation plots
 def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name,run_name, unit):
@@ -183,11 +185,10 @@ def colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant
     # Adjust the layout to prevent clipping of labels
     plt.tight_layout()
 
-    # Show the plot
-    plt.show(block=False)
-
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'ref_vs_pred_scatter.png'))
+
+    plt.close()
 def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name,output_folder_name, X_features, run_name, X_train, X_test):
     # Calculate residuals
     training_residuals = y_train_predicted - y_train
@@ -285,10 +286,13 @@ def field_boxplot(data, model_name, output_folder_name, colo_output_folder, poll
     # field_boxplot(data, 'ModelName', 'OutputFolder', 'ColoOutputFolder', 'Pollutant', 'Unit')
 def field_timeseries(data, model_name, output_folder_name, colo_output_folder, pollutant, unit):
     # Set the figure size
+    tab20_colors = Category20b[20] + Category20c[20]
     plt.figure(figsize=(11, 6))
 
+    #below, the palette was 'tab20' change back if this doesn't work...
+
     # Create a scatter plot using Seaborn
-    sns.scatterplot(x='datetime', y=pollutant, hue='location', data=data, marker='.', palette='tab20')
+    sns.scatterplot(x='datetime', y=pollutant, hue='location', data=data, marker='.', palette=tab20_colors)
 
     # Set labels for the x and y axes
     plt.xlabel('Datetime')
@@ -314,7 +318,7 @@ def field_histogram(data, model_name, output_folder_name, colo_output_folder, po
 
     # Create a histogram for each location using Seaborn
     g = sns.FacetGrid(data=data, col='location', col_wrap=4)
-    g.map(sns.histplot, pollutant, bins=num_bins)  # Adjust the bins as needed , binwidth=bin_width
+    g.map(sns.histplot, pollutant, bins=num_bins, stat = 'probability')  # Adjust the bins as needed , binwidth=bin_width
 
     # Set labels for the x and y axes
     g.set_axis_labels(pollutant + ' Concentration (' + unit + ')', 'Frequency')
@@ -358,17 +362,21 @@ def harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, outp
     fig, axs = plt.subplots(nrows=colo_pod_harmon_data.shape[1], ncols=1, figsize=(15, 8.5))
 
     # Get the tab20 colormap
-    tab20_cmap = plt.cm.get_cmap('tab20')
+    #tab20_cmap = plt.colormaps.get_cmap('tab20')
 
     # Generate a list of 30 colors from the tab20 colormap
-    tab20_colors = [tab20_cmap(i) for i in range(40)]
+    #tab20_colors = [tab20_cmap(i) for i in range(40)]
+    tab20_colors = Category20b[20] + Category20c[20]
 
     # Iterate over each sensor
     for i, sensor in enumerate(colo_pod_harmon_data):
         # Iterate over each key in pod_fitted
         for j, key in enumerate(pod_fitted):
+            # Extract numbers
+            podnum = int(re.search(r'\d+', key).group())
+
             # Scatter plot for fitted values for each key
-            axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.', color=tab20_colors[j])
+            axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.', color=tab20_colors[podnum])
 
         # Plot the actual values for the sensor
         axs[i].plot(colo_pod_harmon_data.index, colo_pod_harmon_data[sensor], color='k')
@@ -400,17 +408,22 @@ def harmon_scatter(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_
     fig, axs = plt.subplots(nrows=math.ceil(colo_pod_harmon_data.shape[1] / 2), ncols=2,
                             figsize=(10, 3 * round(colo_pod_harmon_data.shape[1] / 2)))
 
+    tab20_colors = Category20b[20] + Category20c[20]
+
     # Flatten the axs array to iterate over it
     axs_flat = axs.flatten()
 
     # Iterate over each sensor
     for i, sensor in enumerate(colo_pod_harmon_data):
         # Iterate over each key in pod_fitted
-        for key in pod_fitted:
+        for j, key in enumerate(pod_fitted):
+            #find the pod number (C1, CB1, CC1, etc.) so that they all plot as the same color
+            podnum = int(re.search(r'\d+', key).group())
+
             # Scatter plot of colo_pod_harmon_data vs fitted values for each key
             temp = pd.merge(colo_pod_harmon_data[sensor], pod_fitted[key][sensor], how='outer', left_index=True,
                             right_index=True)
-            axs_flat[i].scatter(temp[sensor + '_x'], temp[sensor + '_y'], label=key, marker='.')
+            axs_flat[i].scatter(temp[sensor + '_x'], temp[sensor + '_y'], label=key, marker='.', color=tab20_colors[podnum])
 
         # Set title for the subplot
         axs_flat[i].set_title(sensor)
@@ -456,22 +469,29 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
     # Split the 'stat' column into two columns using '_' so that testing or training is in one column and the stat is in the other
     stats_df[['data_type', 'stat']] = stats_df['stat'].str.split('_', n=1, expand=True)
 
-    # Create a FacetGrid for visualizing the melted data
-    stat_plot = sns.FacetGrid(stats_df, row='sensor', col='stat', sharey=False, hue='data_type', aspect=2)
+    for sensor in sensors_included:
+        stats_df_subset = stats_df[stats_df['sensor']==sensor]
+        # Create a FacetGrid for visualizing the melted data
+        stat_plot = sns.FacetGrid(stats_df_subset, row='stat', sharey=False, hue='data_type', aspect=6.5)
 
-    # Map a scatter plot for each combination of 'sensor', 'stat', and 'data_type'
-    stat_plot.map(sns.scatterplot, "pod", "value")
+        stats_df_subset['pod'] = stats_df_subset['pod'].str.replace('C', '')
 
-    # Set y-axis limits for the first column of plots
-    for ax in stat_plot.axes[:, 0]:
-        ax.set_ylim(0, 1.2)
+        # Map a scatter plot for each combination of 'sensor', 'stat', and 'data_type'
+        stat_plot.map(sns.scatterplot, "pod", "value")
 
-    plt.show(block=False)
+        # Add a title to the entire figure
+        stat_plot.fig.suptitle(f'{sensor}', fontsize=16, y=0.9, x=0.9)  # Adjust y to move the title higher
 
-    # Save the FacetGrid as an image file
-    stat_plot.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmonization_stats.png'))
+        # Set y-axis limits for the first column of plots
+        for ax in stat_plot.axes[0, :]:
+            ax.set_ylim(0, 1.2)
 
-    plt.figure()
+        plt.show(block=False)
+
+        # Save the FacetGrid as an image file
+        stat_plot.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, f'{sensor}_harmonization_stats.png'))
+
+        #plt.figure()
     # Example usage:
     # harmon_stats_plot(model_stats, 'OutputFolderName', 'ColoOutputFolder', 'SensorsIncluded')
 

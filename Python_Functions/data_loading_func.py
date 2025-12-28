@@ -193,14 +193,53 @@ def load_data(data_file_list, deployment_log, column_names, deployment_type, pol
 
     return pod_data, deployment_log
 
-def field_location(Y_field_df, deployment_log):
+def field_location(Y_field_df, deployment_log, ref_timezone):
+    tz = {
+        'MST': -7,
+        'PST': -8,
+        'CST': -6,
+        'EST': -5,
+        'MDT': -6,
+        'PDT': -7,
+        'CDT': -5,
+        'EDT': -4,
+        'UTC': 0,
+        'UTC+1': 1,
+        'UTC+2': 2,
+        'UTC+3':3,
+        'UTC+4': 4,
+        'UTC+5': 5,
+        'UTC+6': 6,
+        'UTC+7': 7,
+        'UTC+8': 8,
+        'UTC+9': 9,
+        'UTC+10': 10,
+        'UTC+11': 11,
+        'UTC+12': 12,
+        'UTC+13': 13,
+        'UTC+14': 14,
+        'UTC-1': -1,
+        'UTC-2': -2,
+        'UTC-3': -3,
+        'UTC-4': -4,
+        'UTC-5': -5,
+        'UTC-6': -6,
+        'UTC-7': -7,
+        'UTC-8': -8,
+        'UTC-9': -9,
+        'UTC-10': -10,
+        'UTC-11': -11,
+        'UTC-12': -12
+    }
+
+
     Y_field_df['location'] = str()
     field_deployment_log = pd.DataFrame(deployment_log[deployment_log['deployment'] == 'F']).set_index('file_name')
     field_deployment_log['pod'] = [filename.split('_')[0] for filename in field_deployment_log.index]
 
     for file in field_deployment_log.index:
-        # unconvert the pod datetime so that we can compare it to start/stop before the reference timezone change
-        timezone_change_from_ref = field_deployment_log.loc[file, 'timezone_change_from_ref']
+        pod_timezone = field_deployment_log.loc[file, 'timezone']
+        timezone_change_from_ref = tz[pod_timezone] - tz[ref_timezone]
 
         mask = (Y_field_df['pod'] == field_deployment_log.loc[file, 'pod']) & \
                (Y_field_df['datetime'] + pd.to_timedelta(timezone_change_from_ref, unit='h') > field_deployment_log.loc[
