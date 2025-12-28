@@ -25,18 +25,19 @@ hf_set = {}
 
 ####
 #edit the variables in this section for the harmonization - field run
-hf_set['hf_run_name'] = '' # #Name of the harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
+hf_set['hf_run_name'] = 'field_ABUF' # #Name of the   harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
                                                 # ^^ If you want the harmonization/field outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-colo_output_folder = 'Output_240528182037' #the code will pull the best_model from this, and also save new stuff into it
+colo_output_folder = 'Output_CH4_Fig123MQ_finaltest' #the code will pull the best_model from this, and also save new stuff into it
 
-hf_set['run_field'] = True    #True if you want to apply calibration to field data,
+hf_set['run_field'] = True  #True if you want to apply calibration to field data,
                                     #False if you only want to look at harmonization data
-hf_set['best_model'] = 'random_forest'    #model that you would like to apply to field data from the output_folder
+hf_set['best_model'] = 'gradboost'   #model that you would like to apply to field data from the output_folder
+
 hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
-hf_set['field_plot_list'] = ['field_boxplot','field_timeseries'] #field plots: 'field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist'
+hf_set['field_plot_list'] = ['field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist']  #field plots: 'field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist'
                                 # ^^ harmonized_field_hist plots the field data after the harmonization correction is applied but before the field data is calibrated to the colocaiton model
-hf_set['harmon_plot_list'] = [] #harmonization plots: 'harmon_timeseries','harmon_stats_plot', 'harmon_scatter',
-hf_set['TElapsed_in_harmon']= True   # if you have bookended harmonizations, it's a good idea to add in a time elapsed term to the harmonization models
+hf_set['harmon_plot_list'] = ['harmon_timeseries','harmon_stats_plot', 'harmon_scatter'] #harmonization plots: 'harmon_timeseries','harmon_stats_plot', 'harmon_scatter',
+hf_set['TElapsed_in_harmon']= True  # if you have bookended harmonizations, it's a good idea to add in a time elapsed term to the harmonization models
                                     # if you do not have bookended harmonizaitons, adding in time elapsed is probs a bad idea because it will overcorrect.
 
 hf_set['crop_field_time']= False    # set to true if you want to crop the field times that are fit/plotted
@@ -59,6 +60,14 @@ settings = {**settings, **hf_set}
 #close previous figures
 plt.close('all')
 
+# i added met later and then needed to do this on some older colocation runs (generally isn't going to be needed going forward)
+if "met" not in settings['column_names']:
+    settings['column_names']["met"] = ["datetime","Volts", "Fig2600", "Fig2602","Fig3","Fig3heater", "Fig4","Fig4heater", "Misc2611", "PID",  "CO_aux","CO_main",
+                             "Temperature", "Pressure", "Humidity", "Quad1C1", "Quad1C2","Quad1C3","Quad1C4",
+                                "Quad2C1", "Quad2C2","Quad2C3","Quad2C4", "MQ131",
+                             "PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
+                             "PM 25 um", "PM 50 um", "PM 100 um",'OPC_Bin1_','OPC_Bin2','OPC_Bin3','OPC_Bin4','OPC_Bin5','OPC_Bin6','OPC_Bin7','OPC_Bin8',
+                             'OPC_Bin9','OPC_Bin10']
 
 #Create harmonization_field output folder
 if hf_set['hf_run_name']== '':
@@ -84,6 +93,7 @@ deployment_log = data_loading_func.load_deployment_log()
 harmon_file_list = deployment_log[(deployment_log['deployment'] == 'H')]['file_name']
 # shorten the list to just the pod names (not the whole file name)
 harmon_pod_list = [string.split('_')[0] for string in harmon_file_list]
+harmon_pod_list = list(set(harmon_pod_list))
 
 #Identify the colocation pod in the harmonization data
 colo_pod_name= settings['colo_pod_name']
@@ -128,18 +138,29 @@ del preprocessed_harmon_data [colo_pod_name]
 #create a dataframe to add colocation pod harmonization data into
 colo_pod_harmon_data =pd.DataFrame(columns=settings['sensors_included'])
 
+#create a dataframe of overall model stats (R2, RMSE, MBE)
+model_stats_overall = dict.fromkeys(settings['sensors_included'])
+for sensor in settings['sensors_included']:
+    model_stats_overall[sensor] = pd.DataFrame(columns= ['R2','RMSE','MBE'], index = harmon_pod_list)
 
-#create a dictionary of model stats (R2, RMSE, MBE)
+#create a dictionary of model stats (R2, RMSE, MBE) for each cross val fold
 model_stats = dict.fromkeys(['Training_R2','Testing_R2','Training_RMSE','Testing_RMSE','Training_MBE','Testing_MBE'])
 for stat in model_stats:
     model_stats[stat]=dict.fromkeys(settings['sensors_included'])
     for sensor in settings['sensors_included']:
-        model_stats[stat][sensor]=pd.DataFrame(columns=harmon_pod_list,index=range(settings['k_folds']))
+        model_stats[stat][sensor]=pd.DataFrame(columns=harmon_pod_list,index=range(settings['k_folds']+1))
         model_stats[stat][sensor]= model_stats[stat][sensor].drop(columns=colo_pod_name)
 
 #create a dictionary to add lin reg models into for each sensor for each pod
 harmonization_mdls = {key: None for key in pod_harmonization_data}
 del harmonization_mdls[colo_pod_name]
+
+#add the time averaged colocation pod data to a dataframe for plotting later
+for sensor in settings['sensors_included']:
+    if settings['retime_calc'] == 'median':
+        colo_pod_harmon_data[sensor] = pod_harmonization_data[colo_pod_name][sensor].resample(settings['time_interval'] + 'T').median()
+    if settings['retime_calc'] == 'mean':
+        colo_pod_harmon_data[sensor] = pod_harmonization_data[colo_pod_name][sensor].resample(settings['time_interval'] + 'T').mean()
 
 #rename the colocation pod columns so we can differentiate in later code between regular pod and colo pod
 column_coloPod =  {col: col + '_colo' for col in pod_harmonization_data[colo_pod_name].columns}
@@ -163,7 +184,7 @@ for pod_num, podname in enumerate(pod_fitted):
         if settings['TElapsed_in_harmon']:
             settings['earliest_harmon_time'] = deployment_log[deployment_log['deployment']=='H']['start'].min()
             temp = preprocessing_func.add_time_elapsed(temp, settings['earliest_harmon_time'])
-        
+
         #create X and y dataframes for harmonization step
         X=temp.drop([sensor + '_colo'],axis=1)
         y=temp[sensor + '_colo']
@@ -190,28 +211,35 @@ for pod_num, podname in enumerate(pod_fitted):
             y_test_predicted = CV_model.predict(X_test)
             
             # Evaluate the model's performance across each fold
-            model_stats['Training_RMSE'][sensor].iloc[fold,pod_num] = (np.sqrt(mean_squared_error(y_train, y_train_predicted)))
-            model_stats['Testing_RMSE'][sensor].iloc[fold,pod_num] = (np.sqrt(mean_squared_error(y_test, y_test_predicted)))
-            model_stats['Training_R2'][sensor].iloc[fold,pod_num] = round(CV_model.score(X_train, y_train),2)
-            model_stats['Testing_R2'][sensor].iloc[fold,pod_num] = round(CV_model.score(X_test, y_test),2)
-            model_stats['Training_MBE'][sensor].iloc[fold,pod_num] = np.mean(y_train_predicted - y_train)
-            model_stats['Testing_MBE'][sensor].iloc[fold,pod_num] = np.mean(y_test_predicted - y_test)
+            model_stats['Training_RMSE'][sensor].loc[fold,podname] = (np.sqrt(mean_squared_error(y_train, y_train_predicted)))
+            model_stats['Testing_RMSE'][sensor].loc[fold,podname] = (np.sqrt(mean_squared_error(y_test, y_test_predicted)))
+            model_stats['Training_R2'][sensor].loc[fold,podname] = round(CV_model.score(X_train, y_train),2)
+            model_stats['Testing_R2'][sensor].loc[fold,podname] = round(CV_model.score(X_test, y_test),2)
+            model_stats['Training_MBE'][sensor].loc[fold,podname] = np.mean(y_train_predicted - y_train)
+            model_stats['Testing_MBE'][sensor].loc[fold,podname] = np.mean(y_test_predicted - y_test)
 
         # build a model using all data (no CV splitting)
         current_model.fit(X, y)
         pod_fitted[podname][sensor]=current_model.predict(X)
+
+        #save overall fit stats for harmonization model
+        model_stats_overall[sensor].loc[podname,'RMSE'] = (np.sqrt(mean_squared_error(y, pod_fitted[podname][sensor])))
+        model_stats_overall[sensor].loc[podname,'R2'] = round(current_model.score(X, y), 2)
+        model_stats_overall[sensor].loc[podname,'MBE'] = np.mean(pod_fitted[podname][sensor] - y)
+
         #save the model
         harmonization_mdls[podname][sensor]=current_model
         
         #save the raw, unfitted data 
         preprocessed_harmon_data[podname][sensor] = X[sensor]
         
-        #save the colocation pod harmonization data
-        colo_pod_harmon_data[sensor] = y
+        #save the colocation pod harmonization data - not using anymore because we want to save the full timeseries (not only what overalps with current field pod)
+        #colo_pod_harmon_data[sensor] = y
 
     pod_fitted[podname] = pod_fitted[podname].set_index(X.index)
 
 # Harmonization plotting
+
 if 'harmon_stats_plot' in settings['harmon_plot_list']:
     plotting_func.harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, settings['sensors_included'])
     
@@ -220,6 +248,46 @@ if 'harmon_scatter' in settings['harmon_plot_list']:
     
 if 'harmon_timeseries' in settings['harmon_plot_list']:
     plotting_func.harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_folder_name)
+
+
+print('Saving important harmonization data...')
+
+
+# save preprocessed harmonization pod data
+excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_preprocessed_unfitted.xlsx')
+with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
+    # Iterate through the dictionary and write each DataFrame to a sheet
+    for sheet_name, df in preprocessed_harmon_data.items():
+        df.to_excel(writer, sheet_name=sheet_name)
+
+# save fitted harmonization pod data
+excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_harmonized.xlsx')
+with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
+    # Iterate through the dictionary and write each DataFrame to a sheet
+    for sheet_name, df in pod_fitted.items():
+        df.to_excel(writer, sheet_name=sheet_name)
+
+# save colocation pod harmonization data
+colo_pod_harmon_data.to_excel(
+    os.path.join('Outputs', colo_output_folder, output_folder_name, 'colo_pod_harmon_data.xlsx'))
+
+# save model stats
+for stat in model_stats:
+    excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, f'harmonization_{stat}_.xlsx')
+    with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
+        # Iterate through the dictionary and write each DataFrame to a sheet
+        for sheet_name, df in model_stats[stat].items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+# save overall model stats
+excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmon_stats_overall.xlsx')
+with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
+    # Iterate through the dictionary and write each DataFrame to a sheet
+    for sheet_name, df in model_stats_overall.items():
+        df.to_excel(writer, sheet_name=sheet_name)
+
+harmonized_pods = list(pod_harmonization_data)
+del pod_harmonization_data, preprocessed_harmon_data, model_stats_overall, X, X_train, X_test, temp, y, y_train, y_train_predicted, y_test, y_test_predicted, colo_pod_harmon_data
 
 
 ####### start field data
@@ -259,7 +327,7 @@ elif settings['run_field'] == True:
     pod_field_data = joblib.load(os.path.join('Outputs', colo_output_folder, 'pod_field_data.joblib'))
 
     # Check for pods in field_list not present in harmonization_list
-    not_in_harmonization = [item for item in field_pod_list if item not in list(pod_harmonization_data)]
+    not_in_harmonization = set([item for item in field_pod_list if item not in harmonized_pods])
 
     # If there are items not in harmonization_list, raise a KeyError
     if not_in_harmonization:
@@ -267,7 +335,8 @@ elif settings['run_field'] == True:
         print(f"Pods in field_pod_list do not have harmonization model: {not_in_harmonization}. This pods will be skipped!")
         print()
         for i in not_in_harmonization:
-            del pod_field_data[i]
+            if i in pod_field_data:
+                del pod_field_data[i]
 
     # Check if there is any field data
     assert bool(pod_field_data), "No field data was found in the Field folder that matched the deployment log. Stopping execution."
@@ -322,10 +391,6 @@ elif settings['run_field'] == True:
             if "interaction_terms" in settings['preprocess']:
                 X_fitted_field[podname] = preprocessing_func.interaction_terms(X_fitted_field[podname])
 
-            #time elapsed needs to come after time averaging to be accurate (at least for median)
-            if "add_time_elapsed" in settings['preprocess']:
-                X_fitted_field[podname] = preprocessing_func.add_time_elapsed(X_fitted_field[podname], settings['earliest_time'])
-
                 #if you are using a fig2600/fig2602 ratio, make that column here
             if "fig2600_2602_ratio" in settings['preprocess']:
                 X_fitted_field[podname] = preprocessing_func.fig2600_2602_ratio(X_fitted_field[podname])
@@ -342,11 +407,21 @@ elif settings['run_field'] == True:
             if "fig4_3_ratio" in settings['preprocess']:
                 X_fitted_field[podname] = preprocessing_func.fig4_3_ratio(X_fitted_field[podname])
 
+            # time elapsed needs to come after time averaging to be accurate (at least for median)
+            if "add_time_elapsed" in settings['preprocess']:
+                X_fitted_field[podname] = preprocessing_func.add_time_elapsed(X_fitted_field[podname],
+                                                                                settings['earliest_time'])
+
+            temp2 = X_fitted_field[podname].copy()
+
+            temp2[settings['sensors_included']] = settings['scaler'].transform(X_fitted_field[podname][settings['sensors_included']])
 
             #Scaling of fitted X field data
-            X_fitted_field_std[podname] = settings['scaler'].transform(X_fitted_field[podname])
+            X_fitted_field_std[podname] = temp2.to_numpy()
+
             #X_fitted_field_std[podname] = X_fitted_field[podname]
             #^^^^ need to undo this z scoring at the end!!
+
 
             #apply colocation model to the harmonized field data
             Y_field_dict[podname]=pd.DataFrame(fit_model.predict(X_fitted_field_std[podname]),index=X_fitted_field[podname].index,columns=[settings['pollutant']])
@@ -358,6 +433,7 @@ elif settings['run_field'] == True:
 
     del podnames_copy
     del X_fitted_field_noindex
+    del temp2
 
     #convert the Y_field data into a single data frame instead of separated into a dictionary by pod names. Add a column that lists the pod name for the data sample    
     Y_field_df = pd.concat([df.assign(pod=name) for name, df in Y_field_noindex.items()])
@@ -365,8 +441,8 @@ elif settings['run_field'] == True:
     del melted_X
 
     # Add location column to plot by this instead of pod
-    Y_field_df = data_loading_func.field_location(Y_field_df, deployment_log)
-    X_fitted_field_df = data_loading_func.field_location(X_fitted_field_df, deployment_log)
+    Y_field_df = data_loading_func.field_location(Y_field_df, deployment_log, settings['ref_timezone'])
+    X_fitted_field_df = data_loading_func.field_location(X_fitted_field_df, deployment_log, settings['ref_timezone'])
 
     #field plotting
     if 'field_timeseries' in settings['field_plot_list']:
@@ -385,7 +461,7 @@ elif settings['run_field'] == True:
 
 
     #save out important info
-    print('Saving important run data...')
+    print('Saving important field data...')
     #save y_field data by pod
     excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'y_field_estimates_by_pod.xlsx')
     with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
@@ -417,36 +493,11 @@ elif settings['run_field'] == True:
         # Iterate through the dictionary and write each DataFrame to a sheet
         for sheet_name, df in X_fitted_field_std.items():
             df.to_excel(writer, sheet_name=sheet_name)
-        
-#save preprocessed harmonization pod data
-excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_preprocessed_unfitted.xlsx')
-with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
-    # Iterate through the dictionary and write each DataFrame to a sheet
-    for sheet_name, df in preprocessed_harmon_data.items():
-        df.to_excel(writer, sheet_name=sheet_name)
 
 
-#save fitted harmonization pod data
-excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, 'X_harmonized.xlsx')
-with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
-    # Iterate through the dictionary and write each DataFrame to a sheet
-    for sheet_name, df in pod_fitted.items():
-        df.to_excel(writer, sheet_name=sheet_name)
-
-#save colocation pod harmonization data
-colo_pod_harmon_data.to_excel(os.path.join('Outputs', colo_output_folder, output_folder_name, 'colo_pod_harmon_data.xlsx'))
-
-#save settings
+# save settings
 joblib.dump(settings, os.path.join('Outputs', colo_output_folder, output_folder_name, 'run_settings.joblib'))
 
-#save harmonization lin reg models
-joblib.dump(harmonization_mdls, os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmonization_models.joblib'))
-   
-# save model stats
-for stat in model_stats:
-    excel_name = os.path.join('Outputs', colo_output_folder, output_folder_name, f'harmonization_{stat}_.xlsx')
-    with pd.ExcelWriter(excel_name, engine='xlsxwriter') as writer:
-        # Iterate through the dictionary and write each DataFrame to a sheet
-        for sheet_name, df in model_stats[stat].items():
-            df.to_excel(writer, sheet_name=sheet_name,index=False)
-
+# save harmonization lin reg models
+joblib.dump(harmonization_mdls,
+            os.path.join('Outputs', colo_output_folder, output_folder_name, 'harmonization_models.joblib'))

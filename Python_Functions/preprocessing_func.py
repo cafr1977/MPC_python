@@ -5,7 +5,7 @@ Created on Tue Dec 19 14:33:19 2023
 @author: cfris
 """
 import pandas as pd
-from atmos import calculate
+#from atmos import calculate #testing what is broken
 from sklearn.preprocessing import PolynomialFeatures
 import numpy as np
 
@@ -80,6 +80,15 @@ def add_time_elapsed(data, earliest_time):
     data['time_elapsed_seconds'] = data['time_elapsed'].dt.total_seconds()
     data = data.drop('time_elapsed',axis=1)
     return data
+
+def rmv4thofJuly(data):
+    # Ensure index is datetime
+    if not isinstance(data.index, pd.DatetimeIndex):
+        raise TypeError("DataFrame index must be a DatetimeIndex")
+
+    # Filter out July 4th and July 5th
+    mask = ~((data.index.month == 7) & (data.index.day.isin([4, 5])))
+    return data.loc[mask]
 
 def fig2600_2602_ratio(data):
     if 'Fig2600' not in data.columns or 'Fig2602' not in data.columns:
@@ -200,8 +209,7 @@ def preprocessing_func(data, sensors_included, t_warmup, preprocess):
              data= hum_rel_2_abs(data)
          else: 
              raise KeyError('Humidity could not be converted because temperature was not converted to K. Add TempC2K to preprocessing')
-    
-     
+
      #remove unused columns in colo pod and ref
      data = data[sensors_included]
 
@@ -211,6 +219,9 @@ def preprocessing_func(data, sensors_included, t_warmup, preprocess):
      # Remove warm-up
      if "rmv_warmup" in preprocess:
          data = rmv_warmup(data, t_warmup)
+
+     if 'rmv4thofJuly' in preprocess:
+         data = rmv4thofJuly(data)
 
     #remove the random negative CO_aux values
      if "rmv_negative_CO_aux" in preprocess:
