@@ -42,7 +42,7 @@ def colo_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, pollut
     plt.show(block=False)
 
     # Save the plot as an image file
-    plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'ref_colo_timeseries.png'))
+    plt.savefig(os.path.join('Outputs', output_folder_name, model_name + f'ref_colo_timeseries{run_name}.png'))
 
     # Example usage:
     # model_reference_timeseries(y_train, y_train_predicted, y_test, y_test_predicted, 'Pollutant', 'ModelName', 'OutputFolderName')
@@ -148,7 +148,7 @@ def colo_stats_plot(models, model_stats, pollutant, output_folder_name, run_name
     plt.show(block=False)
 
     # save plot in outputs folder
-    plt.savefig(os.path.join('Outputs', output_folder_name, 'colo_model_statistics.png'))
+    plt.savefig(os.path.join('Outputs', output_folder_name, f'colo_model_statistics_{run_name}.png'))
 def colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name,run_name):
     # Set the figure size
     plt.figure(figsize=(8, 8))
@@ -186,7 +186,7 @@ def colo_scatter(y_train, y_train_predicted, y_test, y_test_predicted, pollutant
     plt.tight_layout()
 
     # Save the plot as an image file
-    plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'ref_vs_pred_scatter.png'))
+    plt.savefig(os.path.join('Outputs', output_folder_name, model_name + f'ref_vs_pred_scatter_{run_name}.png'))
 
     plt.close()
 def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name,output_folder_name, X_features, run_name, X_train, X_test):
@@ -235,7 +235,7 @@ def colo_residual(y_train, y_train_predicted, y_test, y_test_predicted, pollutan
     plt.show(block=False)
 
     # Save the plot as an image file
-    plt.savefig(os.path.join('Outputs', output_folder_name, model_name + 'colo_residual.png'))
+    plt.savefig(os.path.join('Outputs', output_folder_name, model_name + f'colo_residual_{run_name}.png'))
 
     # Example usage:
     # residual_plot(y_train, y_train_predicted, y_test, y_test_predicted, X_train, X_test, 'Pollutant', 'ModelName', 'OutputFolderName', X_features)
@@ -264,7 +264,7 @@ def feature_importance(current_model, output_folder_name, run_name, pollutant, m
         plt.show(block=False)
 
         # Save the plot as an image file
-        plt.savefig(os.path.join('Outputs', output_folder_name, model_name + '_feature_important.png'))
+        plt.savefig(os.path.join('Outputs', output_folder_name, model_name + f'_feature_important_{run_name}.png'))
 
 #Field plots
 def field_boxplot(data, model_name, output_folder_name, colo_output_folder, pollutant, unit):
@@ -280,7 +280,7 @@ def field_boxplot(data, model_name, output_folder_name, colo_output_folder, poll
 
     plt.show(block=False)
     # Save the boxplot as an image file
-    plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, model_name + '_field_prediction_boxplot.png'))
+    plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, 'field_prediction_boxplot.png'))
 
     # Example usage:
     # field_boxplot(data, 'ModelName', 'OutputFolder', 'ColoOutputFolder', 'Pollutant', 'Unit')
@@ -301,7 +301,7 @@ def field_timeseries(data, model_name, output_folder_name, colo_output_folder, p
     plt.show(block=False)
     # Save the plot as an image file
     plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name,
-                             model_name + '_field_prediction_timeseries.png'))
+                             'field_prediction_timeseries.png'))
 
     # Example usage:
     # field_timeseries(data, 'ModelName', 'OutputFolderName', 'ColoOutputFolder', 'Pollutant', 'Unit')
@@ -327,7 +327,7 @@ def field_histogram(data, model_name, output_folder_name, colo_output_folder, po
     plt.show(block=False)
 
     # Save the histogram as an image file
-    plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, model_name + '_field_prediction_histogram.png'))
+    plt.savefig(os.path.join('Outputs', colo_output_folder, output_folder_name, 'field_prediction_histogram.png'))
 
 def harmonized_field_hist(data, output_folder_name, colo_output_folder, sensors_included):
     # Set the figure size
@@ -373,10 +373,11 @@ def harmon_timeseries(colo_pod_harmon_data, pod_fitted, colo_output_folder, outp
         # Iterate over each key in pod_fitted
         for j, key in enumerate(pod_fitted):
             # Extract numbers
-            podnum = int(re.search(r'\d+', key).group())
+            #podnum = int(re.search(r'\d+', key).group())
 
             # Scatter plot for fitted values for each key
-            axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.', color=tab20_colors[podnum])
+            #axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.', color=tab20_colors[podnum])
+            axs[i].scatter(pod_fitted[key].index, pod_fitted[key][sensor], label=key, marker='.', color=tab20_colors[j])
 
         # Plot the actual values for the sensor
         axs[i].plot(colo_pod_harmon_data.index, colo_pod_harmon_data[sensor], color='k')
@@ -418,12 +419,13 @@ def harmon_scatter(colo_pod_harmon_data, pod_fitted, colo_output_folder, output_
         # Iterate over each key in pod_fitted
         for j, key in enumerate(pod_fitted):
             #find the pod number (C1, CB1, CC1, etc.) so that they all plot as the same color
-            podnum = int(re.search(r'\d+', key).group())
+            #podnum = int(re.search(r'\d+', key).group())
 
             # Scatter plot of colo_pod_harmon_data vs fitted values for each key
             temp = pd.merge(colo_pod_harmon_data[sensor], pod_fitted[key][sensor], how='outer', left_index=True,
                             right_index=True)
-            axs_flat[i].scatter(temp[sensor + '_x'], temp[sensor + '_y'], label=key, marker='.', color=tab20_colors[podnum])
+            #axs_flat[i].scatter(temp[sensor + '_x'], temp[sensor + '_y'], label=key, marker='.', color=tab20_colors[podnum])
+            axs_flat[i].scatter(temp[sensor + '_x'], temp[sensor + '_y'], label=key, marker='.', color=tab20_colors[j])
 
         # Set title for the subplot
         axs_flat[i].set_title(sensor)
@@ -494,6 +496,7 @@ def harmon_stats_plot(model_stats, output_folder_name, colo_output_folder, senso
         #plt.figure()
     # Example usage:
     # harmon_stats_plot(model_stats, 'OutputFolderName', 'ColoOutputFolder', 'SensorsIncluded')
+
 
 def colo_plots_series(colo_plot_list, y_train, y_train_predicted, y_test, y_test_predicted, pollutant, model_name, output_folder_name, colo_run_name,unit, current_model, features, X_train, X_test):
 # plotting of modelled data

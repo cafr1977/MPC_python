@@ -35,7 +35,12 @@ def mid_end_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def mid_test(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -58,7 +63,12 @@ def mid_test(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def end_test(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -67,7 +77,13 @@ def end_test(test_percentage, X, y):
     split_index = int((1-test_percentage) * len(X))
     # Use train_test_split with shuffle=False so that it takes the last chunk as test set
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=len(X) - split_index, shuffle=False)
-    return X_train, y_train, X_test, y_test
+
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[0:len(X) - split_index, 0] = 'Train'
+    TT.iloc[len(X) - split_index:, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def start_test(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -76,7 +92,13 @@ def start_test(test_percentage, X, y):
     split_index = int(test_percentage * len(X))
     # Split the data without shuffling: first part is the test set
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=split_index, shuffle=False)
-    return X_train, y_train, X_test, y_test
+
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[split_index:, 0] = 'Train'
+    TT.iloc[0:split_index, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def start_end_split(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -105,7 +127,12 @@ def start_end_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def start_mid_split(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -134,7 +161,12 @@ def start_mid_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def split_in_thirds(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -166,7 +198,12 @@ def split_in_thirds(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns = ['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 #takes a random chunk of 10% length, then the other 10% is taken from the data after half way through
 def random_twochunk_split(test_percentage, X, y):
@@ -254,7 +291,12 @@ def testingforvoc(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def testingformethane(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -283,7 +325,12 @@ def testingformethane(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def winter_summer_split(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -323,7 +370,12 @@ def winter_summer_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def winter_summer_NO2_split(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -366,7 +418,12 @@ def winter_summer_NO2_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def winter_summer_C16_split(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -406,7 +463,12 @@ def winter_summer_C16_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def winter_summer_C24_split(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -446,7 +508,12 @@ def winter_summer_C24_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
 
 def winter_summer_CO_split(test_percentage, X, y):
     X, y = check_data(X, y)
@@ -486,4 +553,9 @@ def winter_summer_CO_split(test_percentage, X, y):
     X_train, y_train = X.iloc[train_indices], y.iloc[train_indices]
     X_test, y_test = X.iloc[test_indices], y.iloc[test_indices]
 
-    return X_train, y_train, X_test, y_test
+    TT = pd.DataFrame(columns=['Test/Train'], index=X.index)
+
+    TT.iloc[train_indices, 0] = 'Train'
+    TT.iloc[test_indices, 0] = 'Test'
+
+    return X_train, y_train, X_test, y_test, TT
