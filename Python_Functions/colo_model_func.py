@@ -509,7 +509,9 @@ def svr_(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, pe
 
     return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
 
+'''
 def random_forest_SMOTER(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
+#I am not sure if this works... never implemented it fully.
     X_train = pd.DataFrame(X_train, columns=[f'feature_{i}' for i in range(X_train.shape[1])])
     y_train = pd.Series(y_train)
     y_train = np.array(y_train).ravel()
@@ -556,6 +558,7 @@ def random_forest_SMOTER(X_train, y_train, X_test, y_test, X_std, y, model_name,
                                                      y_train, y_test, y_train_predicted, y_test_predicted, X_std, y, y_predicted)
 
     return percentile_model_stats, model_stats, y_train_predicted, y_test_predicted, y_predicted, current_model
+'''
 def random_forest_sigweight(X_train, y_train, X_test, y_test, X_std, y, model_name, model_stats, percentile_model_stats, settings):
     y_train_zscore = scaler.fit_transform(y_train.values.reshape(-1, 1)).flatten()
     weights = 1/(1+np.exp(-y_train_zscore))**2

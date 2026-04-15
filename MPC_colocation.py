@@ -5,9 +5,8 @@ Created on Tue Dec  5 11:21:47 2023
 @author: cfris
 """
 
-# Caroline's attempt at a python MPC that fixes current problems in Matlab MPC
-# and improves machine learning capabilities
-# for one-hop only
+# Caroline's attempt at a python MPC
+# colocation for one-hop and universal cal
 
 ########
 #Packages to import
@@ -47,21 +46,20 @@ settings={}
 
 #close previous figures
 plt.close('all')
-#PM_5min_LinReg_pieceweight_sensitivity_startend_lotsofweights
-#Variable to change for your analysis #PM_5min_RandomForest_SigWeight_sensitivity
-settings['colo_run_name'] = 'TVOC_featureimportance_calpaper'  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
+#Variable to change for your analysis
+settings['colo_run_name'] = 'testingTimeElapsed'  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
 # ^^ If you want the outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-settings['ref_file_name'] = 'TVOC_editeddata_101023_31024_negativesincluded'
-settings['ref_timezone'] = 'PST'
-settings['pollutant']='TVOC' #make sure this matches the column name in the reference data file (CSV or XLSX)
-settings['unit'] = 'ppb' #concentration units of the target pollutant (for plot labels)
+settings['ref_file_name'] = 'CO2'
+settings['ref_timezone'] = 'PDT'
+settings['pollutant']='CO2' #make sure this matches the column name in the reference data file (CSV or XLSX)
+settings['unit'] = 'ppm' #concentration units of the target pollutant (for plot labels)
 settings['time_interval'] = 60 #time averaging in minutes. needs to be at least as high as the time resolution of the reference data
 settings['retime_calc'] = "median" #How the time averaging is calculated. Options are median and mean right now and are the same for pod and ref
-settings['sensors_included'] = ['Fig2600','Fig2602','Fig3','Temperature', 'Humidity'] #list the sensors you want in the model (both pollutant and environmental, like temperature or humidity)
+settings['sensors_included'] = ['CO2','Temperature','Humidity'] #list the sensors you want in the model (both pollutant and environmental, like temperature or humidity)
 settings['scaler'] = StandardScaler() #How the data is scaled. StandardScaler is mean zero and st dev 1
 settings['t_warmup'] = 60 #warm up period in minutes
 settings['test_percentage'] = 0.2 #what percentage of data goes into the test set, usually 0.2 or 0.3
-settings['traintest_split_type'] = 'random_twochunk_split' #how the data is split into train and test
+settings['traintest_split_type'] = 'mid_end_split' #how the data is split into train and test
 #start_end_split takes the % of the data at the start and % of data at the end to form test set
 # 'mid_end_split' takes % of middle data and % of data at end to form test set
 # 'end_test' takes % of end data to form test set
@@ -70,7 +68,7 @@ settings['traintest_split_type'] = 'random_twochunk_split' #how the data is spli
 # 'split_in_thirds' takes first 10% and another 10% 2/3 into data
 #random_twochunk_split randomly selects two chunks of data to be test data, each chunk being half of the test_percentage (and second chunk being halfway through the data from the first chunk)
 
-settings['colo_plot_list'] = ['colo_stats_plot','colo_scatter','colo_timeseries','feature_importance'] # plots to plot and save
+settings['colo_plot_list'] = ['colo_stats_plot','colo_timeseries'] # plots to plot and save
 #plot options:
 # colo_timeseries: timeseries of predicted Y and reference Y
 # colo_scatter: scatter plot of predicted vs. reference Y
@@ -80,16 +78,15 @@ settings['colo_plot_list'] = ['colo_stats_plot','colo_scatter','colo_timeseries'
 # feature_importance: bar plot of the relative importance of the features used in machine learning models. does not work for linear models.
 #'colo_stats_plot','colo_scatter','colo_timeseries'
 
-settings['models']=['random_forest','gradboost','xg_boost'] #which models are run on the data
+settings['models']=['lin_reg'] #which models are run on the data
 #unweighted options: 'lin_reg','lasso','ridge','random_forest','adaboost', 'gradboost', 'svr_'
 #svr takes a long time
-#adaboost is usually a classification model, so it d"{oesn't work great
+#adaboost is usually a classification model, so it doesn't work great
 #lasso, ridge, random forest, adaboost, gradboost and svr are all common machine learning models.
 
 #for piecewise weighting, can do rf_pieceweight, xgb_pieceweight, and lin_reg_pieceweight
 #for piecewise weighting, need to set the percentile and weight below (can test multiple)
 settings['weighting_percentile'] = [75, 85, 95, 99, 99.5, 99.9] #list which percentiles to test for weighting. All data points in that percentile or higher will be weighted higher than those below.
-#75, 80, 85, 90, 95, 99, 99.5, 99.9
 settings['weighting_weight'] = [0.1] #list what weights to test for a weighted model. All points above the percentile will be given this weight. Those below the percentile will ahve a weight of 1.
 
 #for sigmoid weighting, there are lin_reg_sigweight, random_forest_sigweight, xg_boost_sigweight
@@ -101,14 +98,14 @@ settings['weighting_weight'] = [0.1] #list what weights to test for a weighted m
 lower_percentiles = [0, 5, 25, 50, 75, 95, 95, 99]
 upper_percentiles = [5, 25, 50, 75, 95, 100, 99, 100]
 
-settings['preprocess'] = ["rmv_warmup",'temp_C_2_K', 'add_time_elapsed']
+settings['preprocess'] = ["rmv_warmup",'temp_C_2_K','add_time_elapsed']
 # 'rmv4thofJuly' removes 4th of july data from model (sometimes this data can cause problems since its such an anomaly)
 # temp_C_2_K": converts temperature from C to K, required for HumRel2Abs to run
 #hum_rel_2_abs: converts humidity from relative to absolute
 #rmv_warmup: Removes the first settings['t_warmup'] minutes of data, as well as settings['t_warmup'] minutes of data after the pod cuts out for more than 10 min
 #add_time_elapsed: Adds a column to the X dataframe of how much time has elapsed since the first data point. Helpful for drift
-#'fig2600_2602_ratio', 'fig2600_3_ratio','fig4_2602_ratio','fig4_3_ratio': adds a column to the X dataframe that is fig# divided by fig # (figaro numbers listed in the name)
-    #### ^^ these figaros will only work if you name the columns as fig2600, fig 2602, fig3, and fig4 in settings['column_names']
+#'fig2600_2602_ratio': adds a column to the X dataframe that is fig2600 divided by fig2602
+    #### ^^ these figaros will only work if you name the columns as fig2600 and fig 2602 in settings['column_names']
 #binned_resample: resample the data so that there are the same number of data points per "bin" (number of bins set with settings['n_bins'])
 #resample_quartile: removes a percentage of values from the reference data in the quartile listed in settings['quartiles_to_resample'] (percentage based on settings['quartiles_downsampling_rate'] )
 #"rmv_negative_CO_aux": Filters out negative CO values (not clear why they are occuring)
@@ -166,7 +163,13 @@ settings['column_names'] = {'3.1.0':
                                 "Quad2C1", "Quad2C2","Quad2C3","Quad2C4", "MQ131",
                              "PM 10 ENV", "PM 25 ENV", "PM 100 ENV", "PM 03 um", "PM 05 um", "PM 10 um",
                              "PM 25 um", "PM 50 um", "PM 100 um",'OPC_Bin1_','OPC_Bin2','OPC_Bin3','OPC_Bin4','OPC_Bin5','OPC_Bin6','OPC_Bin7','OPC_Bin8',
-                             'OPC_Bin9','OPC_Bin10']
+                             'OPC_Bin9','OPC_Bin10'],
+
+                            'whittier_modified':
+                            ['datetime','PodName','bmpTemp','bmpPres','Temperature','Humidity','CO2','windSpeed','windDir',
+                            'Quad_Aux1','Quad_Main1','Quad_Aux2','Quad_Main2','Quad_Aux3','Quad_Main3','Quad_Aux4','Quad_Main4',
+                            'Fig210_Heat','Fig2600','Fig280_Heat','Fig2602','blMocon','NULL','ozone_Heat','E2VO3']
+
                             }
 
 ###############
@@ -201,7 +204,7 @@ else:
 
 # Load deployment log
 print('Loading deployment log...')
-deployment_log = data_loading_func.load_deployment_log()
+deployment_log = data_loading_func.load_deployment_log('onehop')
 
 #get the earliest start time (for time elapsed)
 if "add_time_elapsed" in settings['preprocess']:
@@ -220,7 +223,7 @@ if len(settings['colo_pod_name']) != 1:
 
 #load pod data
 print('Loading colocation pod data...')
-colo_pod_data, deployment_log = data_loading_func.load_data(colo_file_list,deployment_log,settings['column_names'], 'C',settings['pollutant'], settings['ref_timezone'])
+colo_pod_data, deployment_log = data_loading_func.onehop_load_data(colo_file_list,deployment_log,settings['column_names'], 'C',settings['pollutant'], settings['ref_timezone'])
 
 if colo_pod_data.empty:
     raise AssertionError("No colocation pod data was found in the Colocation Pod folder that matched the deployment log. Stopping execution.")
@@ -298,18 +301,6 @@ if "add_time_elapsed" in settings['preprocess']:
 if 'fig2600_2602_ratio' in settings['preprocess']:
     data_combined = preprocessing_func.fig2600_2602_ratio(data_combined)
 
-if 'fig2600_3_ratio' in settings['preprocess']:
-    data_combined = preprocessing_func.fig2600_3_ratio(data_combined)
-
-if 'fig3_2602_ratio' in settings['preprocess']:
-    data_combined = preprocessing_func.fig3_2602_ratio(data_combined)
-
-if 'fig4_2602_ratio' in settings['preprocess']:
-    data_combined = preprocessing_func.fig4_2602_ratio(data_combined)
-
-if 'fig4_3_ratio' in settings['preprocess']:
-    data_combined = preprocessing_func.fig4_3_ratio(data_combined)
-
 #begin ML
 print('Initializing models...')
 #create X and y dataframes
@@ -324,53 +315,12 @@ if "interaction_terms" in settings['preprocess']:
 #del data_combined
 
 #Train and Test split
-if settings['traintest_split_type'] == 'end_test':
-    X_train, y_train, X_test, y_test = test_train_split_func.end_test(settings['test_percentage'], X, y)
+if hasattr(test_train_split_func, settings['traintest_split_type']):
+        split_func = getattr(test_train_split_func, settings['traintest_split_type'])
+else:
+    raise ValueError(f"Invalid split type: {settings['traintest_split_type']}")
 
-elif settings['traintest_split_type'] == 'mid_end_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.mid_end_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'start_end_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.start_end_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'start_test':
-    X_train, y_train, X_test, y_test = test_train_split_func.start_test(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'mid_test':
-    X_train, y_train, X_test, y_test = test_train_split_func.mid_test(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'split_in_thirds':
-    X_train, y_train, X_test, y_test = test_train_split_func.split_in_thirds(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'random_twochunk_split':
-    X_train, y_train, X_test, y_test, TT = test_train_split_func.random_twochunk_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'start_mid_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.start_mid_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'testingforvoc':
-    X_train, y_train, X_test, y_test = test_train_split_func.testingforvoc(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'testingformethane':
-    X_train, y_train, X_test, y_test = test_train_split_func.testingformethane(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'winter_summer_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.winter_summer_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'winter_summer_NO2_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.winter_summer_NO2_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'winter_summer_C16_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.winter_summer_C16_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'winter_summer_C24_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.winter_summer_C24_split(settings['test_percentage'], X, y)
-
-elif settings['traintest_split_type'] == 'winter_summer_CO_split':
-    X_train, y_train, X_test, y_test = test_train_split_func.winter_summer_CO_split(settings['test_percentage'], X, y)
-
-else: 
-    raise KeyError('Invalid traintest_split_type, run is ended')
+X_train, y_train, X_test, y_test, TT = split_func(settings['test_percentage'], X, y)
 
 #Bin-based downsampling happens here, only on training data, if included in preprocessing
 if "binned_resample" in settings['preprocess']:
@@ -388,14 +338,10 @@ settings['scaler'].fit(X_train[settings['sensors_included']])
 X_train[settings['sensors_included']] = settings['scaler'].transform(X_train[settings['sensors_included']])
 X_test[settings['sensors_included']] = settings['scaler'].transform(X_test[settings['sensors_included']])
 
-#X_train = X_train.astype(np.float32)
-#X_test = X_test.astype(np.float32)
-
 X_std = X.copy()
 X_std[settings['sensors_included']] = settings['scaler'].transform(X[settings['sensors_included']])
-#X_std = X_std.astype(np.float32)
 X_std_values = X_std.values
-
+'''
 if settings['traintest_split_type'] == 'random_twochunk_split':
     X['Test/Train'] = TT['Test/Train']
     y_df = pd.DataFrame(y)
@@ -408,6 +354,14 @@ if settings['traintest_split_type'] == 'random_twochunk_split':
     y_df.to_csv(os.path.join('Outputs', output_folder_name, 'colo_y_reference.csv'))
 else:
     y.to_csv(os.path.join('Outputs', output_folder_name, 'colo_y_reference.csv'))
+X.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X.csv'))
+'''
+
+X['Test/Train'] = TT['Test/Train']
+y_df = pd.DataFrame(y)
+y_df['Test/Train'] = TT['Test/Train']
+X_std.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X_std.csv'))
+y_df.to_csv(os.path.join('Outputs', output_folder_name, 'colo_y_reference.csv'))
 X.to_csv(os.path.join('Outputs', output_folder_name, 'colo_X.csv'))
 
 #delete unneeded variables
@@ -467,8 +421,7 @@ if settings['models']== ['rf_pieceweight'] or settings['models']== ['lin_reg_pie
             # save out the model and the y predicted
             y_predicted = pd.DataFrame(data=y_predicted, columns=[settings['pollutant']], index=X_std.index)
             y_predicted_TT = y_predicted.copy()
-            if settings['traintest_split_type'] == 'random_twochunk_split':
-                y_predicted_TT['Test/Train'] = TT['Test/Train']
+            y_predicted_TT['Test/Train'] = TT['Test/Train']
 
             y_predicted_TT.to_csv(os.path.join('Outputs', output_folder_name, f'{model_name}_colo_y_predicted.csv'))
             joblib.dump(current_model, os.path.join('Outputs', output_folder_name, f'{model_name}_model.joblib'))
@@ -506,7 +459,10 @@ else:
 
         #save out the model and the y predicted
         y_predicted = pd.DataFrame(data = y_predicted, columns = [settings['pollutant']], index = X_std.index)
-        y_predicted.to_csv(os.path.join('Outputs', output_folder_name, f'{model_name}_colo_y_predicted.csv'))
+        y_predicted_TT = y_predicted.copy()
+        y_predicted_TT['Test/Train'] = TT['Test/Train']
+
+        y_predicted_TT.to_csv(os.path.join('Outputs', output_folder_name, f'{model_name}_colo_y_predicted.csv'))
         joblib.dump(current_model, os.path.join('Outputs', output_folder_name, f'{model_name}_model.joblib'))
 
     #plotting of modelled data
