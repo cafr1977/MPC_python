@@ -25,13 +25,13 @@ hf_set = {}
 
 ####
 #edit the variables in this section for the harmonization - field run
-hf_set['hf_run_name'] = 'field' # #Name of the   harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
+hf_set['hf_run_name'] = '' # #Name of the   harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
                                                 # ^^ If you want the harmonization/field outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-colo_output_folder = 'Output_O3_5min_endtest_L2_onehop' #the code will pull the best_model from this, and also save new stuff into it
+colo_output_folder = 'Output_260430161533' #the code will pull the best_model from this, and also save new stuff into it
 
 hf_set['run_field'] = True  #True if you want to apply calibration to field data,
                                     #False if you only want to look at harmonization data
-hf_set['best_model'] = 'gradboost'   #model that you would like to apply to field data from the output_folder
+hf_set['best_model'] = 'lin_reg'   #model that you would like to apply to field data from the output_folder
 
 hf_set['k_folds'] = 5   #number of folds to split the data into for the k-fold cross validation, usually 5 or 10
 hf_set['field_plot_list'] = ['field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist']  #field plots: 'field_boxplot', 'field_timeseries', 'field_histogram', 'harmonized_field_hist'                             # ^^ harmonized_field_hist plots the field data after the harmonization correction is applied but before the field data is calibrated to the colocaiton model
@@ -78,7 +78,7 @@ else:
 
 # Load deployment log
 print('Loading deployment log...')
-deployment_log = data_loading_func.load_deployment_log('onehop')
+deployment_log = data_loading_func.load_deployment_log('1hop1cal')
 
 # get list of all harmonization files to combine
 harmon_file_list = deployment_log[(deployment_log['deployment'] == 'H')]['file_name']
@@ -98,7 +98,7 @@ if not os.path.exists(os.path.join('Outputs', colo_output_folder, 'pod_harmoniza
     pod_harmonization_data = dict.fromkeys(harmon_pod_list)
 
     print('Loading harmonization pod data from txt files...')
-    pod_harmonization_data, deployment_log = data_loading_func.onehop_load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'], settings['ref_timezone'])
+    pod_harmonization_data, deployment_log = data_loading_func.onehopcal_load_data(harmon_file_list, deployment_log, settings['column_names'], 'H', settings['pollutant'], settings['ref_timezone'])
 
     # Check if there is any harmonization data
     assert bool(pod_harmonization_data), "No harmonization data was found in the Harmonization folder that matched the deployment log. Stopping execution."
@@ -301,7 +301,7 @@ elif settings['run_field'] == True:
         pod_field_data = dict.fromkeys(field_pod_list)
 
         #load pod data
-        pod_field_data, deployment_log = data_loading_func.onehop_load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'], settings['ref_timezone'])
+        pod_field_data, deployment_log = data_loading_func.onehopcal_load_data(field_file_list, deployment_log, settings['column_names'], 'F',settings['pollutant'], settings['ref_timezone'])
 
         for podname in pod_field_data:
             # field data preprocessing
