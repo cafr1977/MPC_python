@@ -25,9 +25,10 @@ hf_set = {}
 
 ####
 # edit the variables in this section for the harmonization - c  field run
-hf_set['hf_run_name'] = 'final_field_gradboost_all'  # #Name of the harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
+hf_set['hf_run_name'] = ''  # #Name of the harmonization/field outputs file. If you leave it blank inside the quotes, the output folder will be named with current datetime
 # ^^ If you want the harmonization/field outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
-colo_output_folder = 'Output_O3_corrected_scaler_UTC'  # the code will pull the best_model from this, and also save new stuff into it
+
+colo_output_folder = 'Output_260430170643'  # the code will pull the best_model from this, and also save new stuff into it
 
 hf_set['run_field'] = True  # This should always be set to true for one cal (there is no harmonization)
 hf_set['best_model'] = {'YPODA2':'gradboost','YPODG5':'gradboost', 'YPODL1':'gradboost','YPODL2':'gradboost','YPODL6':'gradboost','YPODL9':'gradboost','YPODR9':'gradboost'}  # model that you would like to apply to field data from the output_folder. this is individual to each pod
@@ -75,7 +76,7 @@ else:
 
 # Load deployment log
 print('Loading deployment log...')
-deployment_log = data_loading_func.load_deployment_log('onecal')
+deployment_log = data_loading_func.load_deployment_log('individual')
 
 # Identify the colocation pod in the harmonization data
 colo_pod_names = settings['colo_pod_names']
@@ -99,7 +100,7 @@ elif settings['run_field'] == True:
         pod_field_data = dict.fromkeys(field_pod_list)
 
         # load pod data
-        pod_field_data, deployment_log = data_loading_func.onecal_load_data(field_file_list, deployment_log,
+        pod_field_data, deployment_log = data_loading_func.individual_load_data(field_file_list, deployment_log,
                                                                      settings['column_names'], 'F',
                                                                      settings['pollutant'], settings['ref_timezone'])
 

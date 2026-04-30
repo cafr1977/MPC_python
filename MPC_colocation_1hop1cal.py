@@ -47,7 +47,7 @@ settings={}
 #close previous figures
 plt.close('all')
 #Variable to change for your analysis
-settings['colo_run_name'] = 'testingTimeElapsed'  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
+settings['colo_run_name'] = ''  #Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
 # ^^ If you want the outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
 settings['ref_file_name'] = 'CO2'
 settings['ref_timezone'] = 'PDT'
@@ -204,7 +204,7 @@ else:
 
 # Load deployment log
 print('Loading deployment log...')
-deployment_log = data_loading_func.load_deployment_log('onehop')
+deployment_log = data_loading_func.load_deployment_log('1hop1cal')
 
 #get the earliest start time (for time elapsed)
 if "add_time_elapsed" in settings['preprocess']:
@@ -223,7 +223,7 @@ if len(settings['colo_pod_name']) != 1:
 
 #load pod data
 print('Loading colocation pod data...')
-colo_pod_data, deployment_log = data_loading_func.onehop_load_data(colo_file_list,deployment_log,settings['column_names'], 'C',settings['pollutant'], settings['ref_timezone'])
+colo_pod_data, deployment_log = data_loading_func.onehopcal_load_data(colo_file_list,deployment_log,settings['column_names'], 'C',settings['pollutant'], settings['ref_timezone'])
 
 if colo_pod_data.empty:
     raise AssertionError("No colocation pod data was found in the Colocation Pod folder that matched the deployment log. Stopping execution.")

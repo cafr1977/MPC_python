@@ -46,7 +46,7 @@ settings = {}
 
 # close previous figures
 plt.close('all')
-settings['colo_run_name'] = 'onecal_pw_midend_TT'  # Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
+settings['colo_run_name'] = ''  # Name of the outputs file. If you leave it blank inside the quotes, the output folder will be named with current time
 # ^^ If you want the outputs folder to just be named with current datetime, set settings['run_name'] = '' (YOU NEED THE APOSTROPHES/QUOTES)
 settings['ref_file_name'] = 'O3'
 settings['ref_timezone'] = 'UTC' #Specify what timezone the reference data is set in #use UTC for O3 and PDT for CO2 in whittier data
@@ -77,7 +77,7 @@ settings['colo_plot_list'] = ['colo_stats_plot','colo_timeseries']  # plots to p
 # feature_importance: bar plot of the relative importance of the features used in machine learning models. does not work for linear models.
 # 'colo_stats_plot','colo_scatter','colo_timeseries'
 
-settings['models'] = ['lin_reg_pieceweight']  # which models are run on the data
+settings['models'] = ['gradboost']  # which models are run on the data
 # unweighted options: 'lin_reg','lasso','ridge','random_forest','adaboost', 'gradboost', 'xg_boost', 'svr_'
 # svr takes a long time
 # adaboost is usually a classification model, so it d"{oesn't work great
@@ -218,7 +218,7 @@ else:
 
 # Load deployment log
 print('Loading deployment log...')
-deployment_log = data_loading_func.load_deployment_log('onecal')
+deployment_log = data_loading_func.load_deployment_log('individual')
 
 # get the earliest start time (for time elapsed)
 if "add_time_elapsed" in settings['preprocess']:
@@ -276,7 +276,7 @@ for q, colo_pod_name in enumerate(settings['colo_pod_names']):
     # load pod data
     print(f'Loading colocation data for pod {colo_pod_name}...')
     colo_file_list_pod = [file for file in colo_file_list if file.startswith(colo_pod_name)]
-    colo_pod_data, deployment_log = data_loading_func.onecal_load_data(colo_file_list_pod, deployment_log, settings['column_names'],
+    colo_pod_data, deployment_log = data_loading_func.individual_load_data(colo_file_list_pod, deployment_log, settings['column_names'],
                                                                 'C', settings['pollutant'], settings['ref_timezone'])
 
     if colo_pod_data.empty:

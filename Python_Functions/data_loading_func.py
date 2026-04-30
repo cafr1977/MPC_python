@@ -49,7 +49,7 @@ def load_deployment_log(colo_type):
 
     return deployment_log
 
-def onecal_load_data(data_file_list, deployment_log, column_names, deployment_type, pollutant, ref_timezone):
+def individual_load_data(data_file_list, deployment_log, column_names, deployment_type, pollutant, ref_timezone):
 
     tz = {
         'MST': -7,
@@ -196,7 +196,7 @@ def onecal_load_data(data_file_list, deployment_log, column_names, deployment_ty
 
     return pod_data, deployment_log
 
-def onehop_load_data(data_file_list, deployment_log, column_names, deployment_type, pollutant, ref_timezone):
+def onehopcal_load_data(data_file_list, deployment_log, column_names, deployment_type, pollutant, ref_timezone):
 
     tz = {
         'MST': -7,
